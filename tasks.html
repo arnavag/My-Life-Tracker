@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasks | My Life Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ range(1, 999999) | random }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="page-tasks">
+    <nav class="navbar">
+        <div class="nav-brand" style="cursor: pointer;" onclick="window.location.href='/';">
+            <i class="fas fa-chart-line"></i>
+            <span>My Life Tracker</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li><a href="/habits"><i class="fas fa-fire"></i> Habits</a></li>
+            <li><a href="/tasks" class="active"><i class="fas fa-list-check"></i> Tasks</a></li>
+            <li><a href="/budget"><i class="fas fa-wallet"></i> Budget</a></li>
+            <li><a href="/notes"><i class="fas fa-sticky-note"></i> Notes</a></li>
+            <li><a href="/weather"><i class="fas fa-cloud-sun"></i> Weather</a></li>
+            <li><a href="/stats"><i class="fas fa-chart-bar"></i> Stats</a></li>
+        </ul>
+        <div class="theme-toggle-wrapper">
+            <div class="theme-toggle" id="themeToggle">
+                <span class="theme-toggle-icon moon"><i class="fas fa-moon"></i></span>
+                <span class="theme-toggle-icon sun"><i class="fas fa-sun"></i></span>
+                <div class="theme-toggle-slider"></div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="dashboard">
+        <div class="page-header">
+            <h1><i class="fas fa-list-check"></i> Today's Tasks</h1>
+            <p id="taskDate">{{ date }}</p>
+        </div>
+
+        <div class="form-card">
+            <h2>Add Task</h2>
+            <div class="form-group">
+                <input type="text" id="taskInput" placeholder="Enter a Task..." class="input-field">
+                <button onclick="addTask()" class="btn btn-primary"><i class="fas fa-plus"></i> Add Task</button>
+            </div>
+        </div>
+
+        <div class="tasks-list" id="tasksList">
+            <!-- Tasks will be loaded here -->
+        </div>
+    </section>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v={{ range(1, 999999) | random }}"></script>
+    <script>
+        async function loadTasks() {
+            try {
+                const res = await fetch('/api/tasks');
+                const tasks = await res.json();
+                const container = document.getElementById('tasksList');
+                container.innerHTML = '';
+
+                if (!tasks || tasks.length === 0) {
+                    // When there are no tasks, leave the list empty (no placeholder text)
+                    container.innerHTML = '';
+                    return;
+                }
+
+                tasks.forEach(task => {
+                    const taskEl = document.createElement('div');
+                    // use a task-card class that mirrors habit-card styling
+                    taskEl.className = `task-card ${task.completed ? 'completed' : ''}`;
+                    taskEl.innerHTML = `
+                        <div class="task-row">
+                            <div class="task-left">
+                                <input type="checkbox" ${task.completed ? 'checked' : ''} 
+                                       onchange="toggleTask('${task.id}')" class="task-checkbox">
+                            </div>
+                            <div class="task-center">
+                                <span class="task-title">${escapeHtml(task.title)}</span>
+                            </div>
+                            <div class="task-right">
+                                <button onclick="deleteTask('${task.id}')" class="btn btn-danger">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(taskEl);
+                });
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+        }
+
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            const title = input.value.trim();
+            
+            if (!title) return;
+
+            try {
+                const res = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title })
+                });
+
+                if (res.ok) {
+                    input.value = '';
+                    loadTasks();
+                    if (window.notifyDataChanged) window.notifyDataChanged();
+                    else if (window.refreshCharts) window.refreshCharts();
+                } else {
+                    alert('Error adding task');
+                }
+            } catch (error) {
+                console.error('Error adding task:', error);
+                alert('Error adding task');
+            }
+        }
+
+        async function toggleTask(id) {
+            try {
+                const res = await fetch(`/api/tasks/${id}/toggle`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (res.ok) {
+                    loadTasks();
+                    if (window.notifyDataChanged) window.notifyDataChanged();
+                    else if (window.refreshCharts) window.refreshCharts();
+                } else {
+                    alert('Error toggling task');
+                }
+            } catch (error) {
+                console.error('Error toggling task:', error);
+            }
+        }
+
+        async function deleteTask(id) {
+            try {
+                const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    loadTasks();
+                    if (window.notifyDataChanged) window.notifyDataChanged();
+                    else if (window.refreshCharts) window.refreshCharts();
+                } else {
+                    alert('Error deleting task');
+                }
+            } catch (error) {
+                console.error('Error deleting task:', error);
+                alert('Error deleting task');
+            }
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Initialize theme toggle
+        function initThemeToggle() {
+            const themeToggle = document.getElementById('themeToggle');
+            if (!themeToggle) return;
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-theme');
+                themeToggle.classList.add('active');
+            }
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-theme');
+                themeToggle.classList.toggle('active');
+                const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+                localStorage.setItem('theme', currentTheme);
+            });
+        }
+
+        initThemeToggle();
+        // Load tasks on page load
+        loadTasks();
+    </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stats | My Life Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ range(1, 999999) | random }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="page-stats">
+    <nav class="navbar">
+        <div class="nav-brand" style="cursor: pointer;" onclick="window.location.href='/';">
+            <i class="fas fa-chart-line"></i>
+            <span>My Life Tracker</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li><a href="/habits"><i class="fas fa-fire"></i> Habits</a></li>
+            <li><a href="/tasks"><i class="fas fa-list-check"></i> Tasks</a></li>
+            <li><a href="/budget"><i class="fas fa-wallet"></i> Budget</a></li>
+            <li><a href="/notes"><i class="fas fa-sticky-note"></i> Notes</a></li>
+            <li><a href="/weather"><i class="fas fa-cloud-sun"></i> Weather</a></li>
+            <li><a href="/stats" class="active"><i class="fas fa-chart-bar"></i> Stats</a></li>
+        </ul>
+        <div class="theme-toggle-wrapper">
+            <div class="theme-toggle" id="themeToggle">
+                <span class="theme-toggle-icon moon"><i class="fas fa-moon"></i></span>
+                <span class="theme-toggle-icon sun"><i class="fas fa-sun"></i></span>
+                <div class="theme-toggle-slider"></div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="dashboard">
+        <div class="page-header">
+            <h1><i class="fas fa-chart-bar"></i> Statistics</h1>
+            <p>Track your Progress and Analytics</p>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3><i class="fas fa-fire"></i> Weekly Habit Progress</h3>
+                    <div class="chart-legend" aria-hidden="true">
+                        <span class="legend-swatch"></span>
+                        <span class="legend-label">Habits Completed</span>
+                    </div>
+                </div>
+                <canvas id="weeklyHabitChart" data-period="week" data-chart="bar"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3><i class="fas fa-fire"></i> Weekly Task Progress</h3>
+                    <div class="chart-legend" aria-hidden="true">
+                        <span class="legend-swatch"></span>
+                        <span class="legend-label">Tasks Completed</span>
+                    </div>
+                </div>
+                <canvas id="weeklyTaskChart" data-period="week" data-chart="line"></canvas>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <i class="fas fa-fire"></i>
+                <h3>Weekly Habits Completed</h3>
+                <p id="activeHabits">0</p>
+            </div>
+            <div class="stat-box">
+                <i class="fas fa-percentage"></i>
+                <h3>Weekly Habits Missed</h3>
+                <p id="habitsCompleted">0</p>
+            </div>
+            <div class="stat-box">
+                <i class="fas fa-list-check"></i>
+                <h3>Weekly Tasks Completed</h3>
+                <p id="totalTasks">0</p>
+            </div>
+            <div class="stat-box">
+                <i class="fas fa-percentage"></i>
+                <h3>Weekly Tasks Missed</h3>
+                <p id="completedTasks">0</p>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Initialize theme toggle
+        function initThemeToggle() {
+            const themeToggle = document.getElementById('themeToggle');
+            if (!themeToggle) return;
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-theme');
+                themeToggle.classList.add('active');
+            }
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-theme');
+                themeToggle.classList.toggle('active');
+                const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+                localStorage.setItem('theme', currentTheme);
+            });
+        }
+
+        // The charts on this page are managed by /static/js/script.js which
+        // exposes window.refreshCharts(). Call it on load to ensure everything
+        // is populated and stays consistent with other pages.
+        document.addEventListener('DOMContentLoaded', () => {
+            initThemeToggle();
+            if (window.refreshCharts) window.refreshCharts();
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/script.js') }}?v={{ range(1, 999999) | random }}"></script>
+</body>
+</html>

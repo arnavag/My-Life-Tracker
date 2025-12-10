@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habits | My Life Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ range(1, 999999) | random }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Target only the Habits page subtitle to apply the requested color. */
+        body.page-habits .page-header > p.page-subtitle {
+            color: #A7CFC2 !important;
+        }
+        /* No custom sizing for habit input; rely on global .input-field so it matches Tasks exactly */
+        
+        /* Force placeholder opacity to exactly match Tasks page - Safari-specific overrides */
+        body.page-habits .input-field::placeholder,
+        body.page-habits .input-field::-webkit-input-placeholder {
+            color: rgba(255,255,255,0.35) !important;
+            opacity: 1 !important;
+            -webkit-text-fill-color: rgba(255,255,255,0.35) !important;
+        }
+        
+        body.page-habits #habitName::placeholder,
+        body.page-habits #habitName::-webkit-input-placeholder {
+            color: rgba(255,255,255,0.35) !important;
+            opacity: 1 !important;
+            -webkit-text-fill-color: rgba(255,255,255,0.35) !important;
+        }
+    </style>
+</head>
+<body class="page-habits">
+    <nav class="navbar">
+        <div class="nav-brand" style="cursor: pointer;" onclick="window.location.href='/';">
+            <i class="fas fa-chart-line"></i>
+            <span>My Life Tracker</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li><a href="/habits" class="active"><i class="fas fa-fire"></i> Habits</a></li>
+            <li><a href="/tasks"><i class="fas fa-list-check"></i> Tasks</a></li>
+            <li><a href="/budget"><i class="fas fa-wallet"></i> Budget</a></li>
+            <li><a href="/notes"><i class="fas fa-sticky-note"></i> Notes</a></li>
+            <li><a href="/weather"><i class="fas fa-cloud-sun"></i> Weather</a></li>
+            <li><a href="/stats"><i class="fas fa-chart-bar"></i> Stats</a></li>
+        </ul>
+        <div class="theme-toggle-wrapper">
+            <div class="theme-toggle" id="themeToggle">
+                <span class="theme-toggle-icon moon"><i class="fas fa-moon"></i></span>
+                <span class="theme-toggle-icon sun"><i class="fas fa-sun"></i></span>
+                <div class="theme-toggle-slider"></div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="dashboard">
+        <div class="page-header">
+            <h1 id="habitTitle"><i class="fas fa-fire"></i> My Habit Tracker</h1>
+            <p class="page-subtitle">Build and Track your Daily Habits</p>
+        </div>
+
+        <div class="form-card">
+            <h2>Add New Habit</h2>
+            <form autocomplete="off" onsubmit="event.preventDefault(); addHabit();">
+                <div class="form-group">
+                    <!-- Use standard input to match all other text inputs in the app -->
+                    <input type="text" 
+                           id="habitName" 
+                           class="input-field" 
+                           name="habit-field-random-82731" 
+                           placeholder="Enter Habit Name..." 
+                           autocomplete="off" 
+                           autocomplete="new-password"
+                           autocorrect="off" 
+                           autocapitalize="off" 
+                           spellcheck="false" 
+                           inputmode="text"
+                           readonly 
+                           onfocus="this.removeAttribute('readonly');">
+                    <button type="button" onclick="addHabit()" class="btn btn-primary"><i class="fas fa-plus"></i> Add Habit</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="habits-list" id="habitsList">
+            <!-- Habits will be loaded here -->
+        </div>
+    </section>
+
+    <script>
+        // Aggressively disable Safari autofill/autocomplete for habit input
+        document.addEventListener('DOMContentLoaded', function() {
+            const habitInput = document.getElementById('habitName');
+            if (habitInput) {
+                // Remove autocomplete attribute and force it off via JS
+                habitInput.setAttribute('autocomplete', 'new-password'); // tricks Safari
+                habitInput.setAttribute('autocomplete', 'off');
+                habitInput.setAttribute('autocomplete', 'nope');
+                
+                // Disable Safari's autofill dropdown
+                habitInput.addEventListener('focus', function() {
+                    this.setAttribute('autocomplete', 'off');
+                    this.setAttribute('autocomplete', 'new-password');
+                });
+                
+                // Clear any stored form data on load
+                habitInput.value = '';
+            }
+        });
+
+        // --- Habit local completion helpers (persist lastCompletedDate per habit) ---
+        function getTodayLocalISO() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${date}`;
+        }
+
+        function getHabitLastCompleted(id) {
+            try { return localStorage.getItem('habit_lastCompleted_' + id); } catch (e) { return null; }
+        }
+
+        function setHabitLastCompleted(id, isoDate) {
+            try { localStorage.setItem('habit_lastCompleted_' + id, isoDate); } catch (e) { /* ignore */ }
+        }
+
+        function removeHabitLastCompleted(id) {
+            try { localStorage.removeItem('habit_lastCompleted_' + id); } catch (e) { /* ignore */ }
+        }
+
+        function habitCompletedLocallyToday(id) {
+            const last = getHabitLastCompleted(id);
+            return last === getTodayLocalISO();
+        }
+
+        function clearStaleHabitLocal(id) {
+            try {
+                const last = getHabitLastCompleted(id);
+                if (!last) return;
+                if (last !== getTodayLocalISO()) {
+                    localStorage.removeItem('habit_lastCompleted_' + id);
+                }
+            } catch (e) { }
+        }
+
+        // Enforce midnight reset: run on load/focus and schedule a timer to run exactly at next midnight
+        function enforceMidnightResetAll() {
+            try {
+                const today = getTodayLocalISO();
+                document.querySelectorAll('.habit-card').forEach(card => {
+                    try {
+                        const btn = card.querySelector('.habit-actions .btn');
+                        const id = card.getAttribute('data-habit-id');
+                        if (!id) return;
+                        const last = getHabitLastCompleted(id);
+                        if (last === today) {
+                            // should be in completed state
+                            if (btn) {
+                                btn.classList.remove('btn-secondary');
+                                btn.classList.add('btn-done');
+                                btn.innerHTML = `<i class="fas fa-check"></i> Completed`;
+                                btn.disabled = false; // Allow toggling back
+                            }
+                        } else {
+                            // reset to Mark Done
+                            if (btn) {
+                                btn.classList.remove('btn-done');
+                                btn.classList.add('btn-secondary');
+                                btn.innerHTML = `<i class="fas fa-check"></i> Mark Done`;
+                                btn.disabled = false;
+                            }
+                        }
+                    } catch(e) {}
+                });
+            } catch (e) { /* ignore */ }
+        }
+
+        // schedule function to run exactly at next local midnight
+        function scheduleMidnightEnforcer() {
+            try {
+                const now = new Date();
+                const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+                const ms = next.getTime() - now.getTime();
+                setTimeout(() => {
+                    // On midnight, clear local lastCompleted markers older than today and reset buttons
+                    // Do not modify counters
+                    document.querySelectorAll('[data-habit-id]').forEach(el => {
+                        const id = el.getAttribute('data-habit-id');
+                        if (!id) return;
+                        // remove local marker if not today
+                        clearStaleHabitLocal(id);
+                    });
+                    // enforce reset UI
+                    enforceMidnightResetAll();
+                    // reschedule for next midnight
+                    scheduleMidnightEnforcer();
+                }, ms + 20); // slight buffer
+            } catch (e) { /* ignore */ }
+        }
+
+        async function loadHabits() {
+            try {
+                const res = await fetch('/api/habits');
+                const habits = await res.json();
+                console.log('Loaded habits from server:', habits);
+                console.log('Number of habits:', Object.keys(habits || {}).length);
+                
+                // Clean up localStorage for any habits that no longer exist
+                const habitIds = new Set(Object.keys(habits || {}));
+                try {
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && key.startsWith('habit_lastCompleted_')) {
+                            const id = key.replace('habit_lastCompleted_', '');
+                            if (!habitIds.has(id)) {
+                                localStorage.removeItem(key);
+                                console.log('Cleaned up stale localStorage for deleted habit:', id);
+                            }
+                        }
+                    }
+                } catch (e) { console.error('Error cleaning localStorage:', e); }
+                
+                const container = document.getElementById('habitsList');
+                container.innerHTML = '';
+
+                // show older habits first so newly added habit appears at the bottom
+                const habitArray = Object.values(habits || {}).slice().sort((a,b) => {
+                    const da = a && a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const db = b && b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return da - db;
+                });
+
+            // helpers
+            function capitalize(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+            function getISOWeek(d) {
+                const date = new Date(d);
+                const dayNum = (date.getUTCDay() + 6) % 7;
+                date.setUTCDate(date.getUTCDate() - dayNum + 3);
+                const firstThursday = new Date(Date.UTC(date.getUTCFullYear(),0,4));
+                const diff = date - firstThursday;
+                return 1 + Math.round(diff / (7 * 24 * 60 * 60 * 1000));
+            }
+            function monthKey(d){ const dt=new Date(d); return dt.getUTCFullYear()+'-'+(dt.getUTCMonth()+1); }
+
+            habitArray.forEach(habit => {
+                // Use LOCAL date (not UTC) for consistency with server date format
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const date = String(now.getDate()).padStart(2, '0');
+                const todayLocal = `${year}-${month}-${date}`;
+                
+                // Completed if either server says completed today OR local client recorded completion today
+                const serverCompleted = (habit.completed_dates || []).includes(todayLocal);
+                const localCompleted = habitCompletedLocallyToday(habit.id);
+                const isCompleted = serverCompleted || localCompleted;
+                // ensure we keep local marker if server already had it
+                if (serverCompleted && !localCompleted) {
+                    setHabitLastCompleted(habit.id, todayLocal);
+                }
+                // Clean up local storage if server doesn't have today's date but localStorage does
+                if (!serverCompleted && localCompleted) {
+                    console.warn('Mismatch: localStorage says completed but server does not. Clearing localStorage for habit:', habit.name);
+                    removeHabitLastCompleted(habit.id);
+                }
+                console.log('Habit:', habit.name, 'ID:', habit.id, 'Today:', todayLocal, 'ServerCompleted:', serverCompleted, 'LocalCompleted:', localCompleted, 'isCompleted:', isCompleted);
+
+                // Normalize any legacy 'monthly' frequency to 'weekly' for UI/display purposes
+                const rawFreq = habit.frequency || 'daily';
+                const freq = (rawFreq === 'monthly') ? 'weekly' : rawFreq;
+                const freqLabel = capitalize(freq);
+
+                // compute streak/aggregate based on normalized frequency (daily or weekly)
+                const completed = habit.completed_dates || [];
+                let streakCount = 0;
+                let unit = 'Days';
+                if (freq === 'daily') {
+                    streakCount = completed.length;
+                    unit = (streakCount === 1) ? 'Day' : 'Days';
+                } else if (freq === 'weekly') {
+                    const weeks = new Set();
+                    completed.forEach(d => {
+                        try { const dt = new Date(d); const key = dt.getUTCFullYear() + '-W' + getISOWeek(d); weeks.add(key); } catch(e){}
+                    });
+                    streakCount = weeks.size;
+                    unit = (streakCount === 1) ? 'Week' : 'Weeks';
+                } else {
+                    streakCount = completed.length;
+                    unit = (streakCount === 1) ? 'Day' : 'Days';
+                }
+
+                const card = document.createElement('div');
+                card.className = 'habit-card';
+                // attach habit id for DOM-level helpers
+                card.setAttribute('data-habit-id', habit.id);
+                // Choose the display label and count depending on frequency
+                let displayLabel = 'Days Completed';
+                let displayCount = (typeof habit.days_completed === 'number') ? habit.days_completed : (completed.length || 0);
+                if (freq === 'weekly') {
+                    displayLabel = 'Weeks Completed';
+                    displayCount = streakCount;
+                }
+                card.innerHTML = `
+                    <div class="habit-header">
+                        <h3>${habit.name}</h3>
+                    </div>
+                    <div class="habit-body">
+                        <p>${displayLabel}: <span class="progress-count">${displayCount}</span></p>
+                    </div>
+                    <div class="habit-actions">
+                        <button onclick="toggleHabit(this, '${habit.id}')" class="btn ${isCompleted ? 'btn-done' : 'btn-secondary'}">
+                            <i class="fas fa-check"></i> ${isCompleted ? 'Completed' : 'Mark Done'}
+                        </button>
+                        <button onclick="deleteHabit('${habit.id}')" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            // After rendering, ensure UI matches local/Server state and set midnight enforcer
+            try { enforceMidnightResetAll(); } catch (e) {}
+            try { scheduleMidnightEnforcer(); } catch (e) {}
+            } catch (err) {
+                console.error('Error loading habits:', err);
+            }
+        }
+
+        // Frequency selection removed from UI; default to 'daily' when adding a habit.
+
+        // Helper to read the habit input (now standard input)
+        function getHabitInputValue() {
+            const el = document.getElementById('habitName');
+            return el ? el.value.trim() : '';
+        }
+
+        function clearHabitInput() {
+            const el = document.getElementById('habitName');
+            if (el) el.value = '';
+        }
+
+        async function addHabit() {
+            const name = getHabitInputValue();
+            // Frequency UI removed; default to daily for new habits
+            const frequency = 'daily';
+
+            if (!name) {
+                console.log('No habit name entered');
+                return;
+            }
+
+            console.log('Adding habit:', name);
+
+            try {
+                const res = await fetch('/api/habits', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, frequency })
+                });
+
+                if (res.ok) {
+                    const newHabit = await res.json();
+                    console.log('Habit added successfully:', newHabit);
+                    clearHabitInput();
+                    loadHabits();
+                } else {
+                    console.error('Failed to add habit. Status:', res.status);
+                    const error = await res.text();
+                    console.error('Error:', error);
+                }
+            } catch (err) {
+                console.error('Error adding habit:', err);
+            }
+        }
+
+        async function toggleHabit(btn, id) {
+            // Toggle button state between "Mark Done" and "Completed"
+            // Can click to mark as done, or click again to undo
+            
+            try {
+                const button = btn;
+                const card = button.closest('.habit-card');
+                const progressEl = card ? card.querySelector('.progress-count') : null;
+
+                // Determine current button state from CSS class
+                const isCurrentlyCompleted = button.classList.contains('btn-done');
+
+                // Get current displayed count
+                let currentDays = 0;
+                if (progressEl) currentDays = parseInt(progressEl.textContent || '0', 10) || 0;
+
+                if (isCurrentlyCompleted) {
+                    // Toggle back to "Mark Done" state
+                    button.classList.remove('btn-done');
+                    button.classList.add('btn-secondary');
+                    button.innerHTML = `<i class="fas fa-check"></i> Mark Done`;
+                    button.disabled = false;
+                    
+                    // Decrement the days completed counter
+                    if (progressEl && currentDays > 0) progressEl.textContent = String(currentDays - 1);
+
+                    // Remove local completion tracking
+                    try { removeHabitLastCompleted(id); } catch (e) {}
+
+                    console.log('Habit unmarked - reverted to Mark Done');
+                } else {
+                    // Toggle to "Completed" state
+                    button.classList.remove('btn-secondary');
+                    button.classList.add('btn-done');
+                    button.innerHTML = `<i class="fas fa-check"></i> Completed`;
+                    button.disabled = false;
+                    
+                    // Increment the days completed counter
+                    if (progressEl) progressEl.textContent = String(currentDays + 1);
+
+                    // Persist local completion
+                    try { setHabitLastCompleted(id, getTodayLocalISO()); } catch (e) {}
+
+                    console.log('Habit marked as completed');
+                }
+
+                // Send toggle request to server to persist the state change
+                const res = await fetch(`/api/habits/${id}/toggle`, { method: 'POST' });
+
+                if (!res.ok) {
+                    // Server request failed - refresh from server to get authoritative state
+                    console.error('Toggle request failed with status', res.status);
+                    await loadHabits();
+                } else {
+                    // Success! Keep the optimistic UI state
+                    // Notify other tabs/windows about the update
+                    try { localStorage.setItem('habit-updated', Date.now()); } catch(e){}
+                    console.log('Habit state persisted to server');
+                }
+            } catch (err) {
+                console.error('Error toggling habit:', err);
+                // Reload habits to recover from any error state
+                await loadHabits();
+            }
+        }
+
+        
+
+        async function deleteHabit(id) {
+            // delete immediately without a confirm modal
+            try {
+                await fetch('/api/habits', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+            } catch (e) {
+                console.error('Error deleting habit', e);
+            }
+            loadHabits();
+        }
+
+        // Initialize theme toggle
+        function initThemeToggle() {
+            const themeToggle = document.getElementById('themeToggle');
+            if (!themeToggle) return;
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-theme');
+                themeToggle.classList.add('active');
+            }
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-theme');
+                themeToggle.classList.toggle('active');
+                const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+                localStorage.setItem('theme', currentTheme);
+            });
+        }
+
+        initThemeToggle();
+
+        loadHabits();
+    // Ensure midnight reset runs on focus (when user returns to the tab)
+    window.addEventListener('focus', () => { try { enforceMidnightResetAll(); } catch (e) {} });
+    // Also run when page is shown (back/forward cache)
+    window.addEventListener('pageshow', () => { try { enforceMidnightResetAll(); } catch (e) {} });
+
+        // ===== ROBUST DATE-DEPENDENT BUTTON STATE LOGIC =====
+        // Track today's date string in LOCAL timezone (not UTC) for accurate midnight detection
+        function getTodayLocal() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${date}`;
+        }
+
+        let __today_local = getTodayLocal();
+
+        // When the page regains focus or becomes visible (e.g., user returns after midnight),
+        // compare the current local date with the stored value. If it changed, reload habits so
+        // buttons recompute their state from the server-side stored completed_dates.
+        function _checkDayChangeAndReload() {
+            try {
+                const nowLocal = getTodayLocal();
+                if (nowLocal !== __today_local) {
+                    console.log('Date changed from', __today_local, 'to', nowLocal, '- reloading habits');
+                    __today_local = nowLocal;
+                    loadHabits();
+                }
+            } catch (e) { console.error('Error in _checkDayChangeAndReload:', e); }
+        }
+
+        window.addEventListener('focus', _checkDayChangeAndReload);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') _checkDayChangeAndReload();
+        });
+
+        // Check for day change every 30 seconds (catches midnight transitions reliably)
+        const dayCheckInterval = setInterval(_checkDayChangeAndReload, 30000);
+
+        // Also calculate time until next midnight and schedule a precise reload at that moment
+        function scheduleNextMidnightReload() {
+            try {
+                const now = new Date();
+                const tomorrow = new Date(now);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(0, 0, 0, 0);
+                const msUntilMidnight = tomorrow - now;
+                
+                console.log('Next midnight in', Math.round(msUntilMidnight / 1000), 'seconds');
+                
+                setTimeout(() => {
+                    console.log('Midnight reached! Reloading habits...');
+                    __today_local = getTodayLocal();
+                    loadHabits();
+                    // Schedule the next midnight reload
+                    scheduleNextMidnightReload();
+                }, msUntilMidnight);
+            } catch (e) { console.error('Error scheduling midnight reload:', e); }
+        }
+
+        scheduleNextMidnightReload();
+
+        // Listen for habit updates from other tabs/windows and refresh when they occur.
+        window.addEventListener('storage', (ev) => {
+            try {
+                if (ev.key === 'habit-updated') loadHabits();
+            } catch (e) {}
+        });
+    </script>
+        <!-- Force reload stylesheet to avoid stale cache so recent CSS edits appear immediately -->
+        <script>
+            (function(){
+                try {
+                    const links = document.querySelectorAll('link[rel="stylesheet"][href*="css/style.css"]');
+                    links.forEach(l => {
+                        const href = l.getAttribute('href').split('?')[0];
+                        l.href = href + '?v=' + Date.now();
+                    });
+                } catch (e) { /* no-op */ }
+            })();
+        </script>
+</body>
+</html>

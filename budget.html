@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget | My Life Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ range(1, 999999) | random }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Layout: two-column grid, left = chart, right = transactions */
+        .budget-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* two equal columns on desktop */
+            gap: 1.5rem; /* standard horizontal gap used across the app */
+            margin-bottom: 0; /* spacing handled by budget-overview above */
+            align-items: stretch; /* make columns equal height */
+            align-content: start;
+        }
+
+        /* Chart & transactions cards: use same card style and fill their grid cell */
+        .chart-card {
+            width: 100%;
+            max-width: none;
+            min-height: 420px; /* ensure visual weight matches design */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: 1.5rem;
+        }
+
+        /* Transactions card shares same sizing rules */
+        .transactions-card { width: 100%; display: flex; flex-direction: column; padding: 1.5rem; min-height: 420px; }
+
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0.8rem 0; /* align with chart canvas top spacing */
+        }
+
+        /* Reduce the doughnut canvas size by ~27% (was 520px) */
+        #budgetChart {
+            max-width: 380px;
+            max-height: 380px;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Transactions panel: compact when few items, but scrolls when many */
+        .transactions-list {
+            grid-column: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: 640px;
+        }
+
+        /* Transactions content is allowed to size naturally; use overflow when needed */
+        #transactionsContent {
+            overflow: auto;
+            padding-right: 0.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding-top: 0.8rem; /* same vertical rhythm as chart content */
+        }
+
+        /* Ensure the Add Expense form below the cards has standard section spacing */
+        .budget-container + .form-card {
+            margin-top: 2rem; /* match dashboard section spacing */
+        }
+
+        /* Budget overview: full-width row of three equal cards */
+        .budget-overview {
+            display: flex;
+            gap: 1.5rem; /* consistent horizontal gap with grid */
+            margin-bottom: 2rem; /* match spacing between major sections */
+            align-items: stretch;
+            width: 100%;
+        }
+
+        .budget-overview .budget-card {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: 1 1 0;
+            min-width: 0;
+            min-height: 88px;
+            contain: layout style;
+        }
+
+    /* Remaining card uses the same styling as other budget cards to keep sizes uniform */
+    /* Previously a green accent line and special number styles were applied here; removed to ensure uniform cards */
+
+        .budget-card h3 { margin: 0 0 6px 0; font-size: 0.95rem; color: var(--text-muted); }
+        .budget-card .big-number { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-main); }
+        .budget-card .subtle { font-size: 0.9rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Transaction row improvements */
+        .transaction-item {
+            background: var(--card-bg);
+            padding: 0.8rem 0.8rem;
+            border-radius: 10px;
+            display: flex;
+            align-items: center; /* vertically center children, including delete button */
+            gap: 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .transaction-info {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .transaction-info h4 { margin: 0; font-size: 1rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .transaction-info p { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+        .transaction-info small { color: var(--text-muted); font-size: 0.8rem; }
+
+        .transaction-amount { flex: 0 0 auto; font-weight: 700; color: var(--text-main); margin-right: 8px; }
+
+        .transaction-item button.btn-danger { 
+            flex: 0 0 auto; 
+            align-self: center; 
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 1100px) {
+            /* Tablet: keep two columns but reduce gap slightly */
+            .budget-container { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+            .chart-card, .transactions-card { min-height: 360px; }
+        }
+
+        @media (max-width: 768px) {
+            /* Mobile: stack vertically */
+            .budget-container { grid-template-columns: 1fr; gap: 1rem; }
+            .chart-card, .transactions-card { min-height: auto; }
+            .budget-overview { flex-direction: column; gap: 10px; }
+        }
+        /* Hide number input spinner for the Add Expense amount field while preserving numeric input */
+        .form-card .input-field[type="number"]::-webkit-outer-spin-button,
+        .form-card .input-field[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .form-card .input-field[type="number"] {
+            appearance: textfield;
+            -moz-appearance: textfield;
+        }
+
+        /* Also hide native spinner arrows for the Monthly Budget input (#budgetLimit)
+           across WebKit (Chrome, Safari) and Firefox without changing layout.
+           This only affects the arrows; height/padding/border/font remain untouched. */
+        body.page-budget input#budgetLimit[type="number"]::-webkit-outer-spin-button,
+        body.page-budget input#budgetLimit[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* Firefox: render as textfield to remove arrows */
+        body.page-budget input#budgetLimit[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+        /* Edge/IE: also hide the clear/spinner if present */
+        body.page-budget input#budgetLimit[type="number"]::-ms-clear,
+        body.page-budget input#budgetLimit[type="number"]::-ms-expand {
+            display: none;
+            width: 0;
+            height: 0;
+        }
+        /* Page-specific text color overrides for Budget page */
+        .dashboard .page-header h1,
+        .dashboard .page-header p,
+        .budget-card h3,
+        .form-card h2,
+        .budget-card .big-number,
+        .transaction-item .transaction-info,
+        .transaction-item .transaction-info div,
+        .transaction-item .transaction-info small,
+        .input-field {
+            color: #F2F3F4 !important;
+        }
+
+          /* (Removed) subtitle CSS moved inline on the element to fully detach
+              it from inherited/theme rules and ensure exact color in all states. */
+
+        /* Muted helper text */
+        .subtle, .transaction-item .transaction-info small, .input-field::placeholder {
+            color: rgba(242,243,244,0.7) !important;
+        }
+
+        /* Budget inputs: removed color overrides to match Habits/Tasks appearance.
+           Now inherits from global .input-field styling for consistent look across pages. */
+
+        /* Placeholder rules: include vendor-prefixed selectors to cover different browsers.
+           Use a muted helper color for placeholders so budgetLimit matches Description (optional). */
+        body.page-budget input#amount::placeholder,
+        body.page-budget input#amount::-webkit-input-placeholder,
+        body.page-budget input#amount::-moz-placeholder,
+        body.page-budget input#amount:-ms-input-placeholder,
+        body.page-budget input#amount::-ms-input-placeholder,
+        body.page-budget input#description::placeholder,
+        body.page-budget input#description::-webkit-input-placeholder,
+        body.page-budget input#description::-moz-placeholder,
+        body.page-budget input#description:-ms-input-placeholder,
+        body.page-budget input#description::-ms-input-placeholder {
+            color: #697c75 !important;
+            -webkit-text-fill-color: #697c75 !important;
+            opacity: 1 !important;
+        }
+
+        /* Make the budgetLimit placeholder match the Amount and Description placeholders */
+        body.page-budget input#budgetLimit::placeholder,
+        body.page-budget input#budgetLimit::-webkit-input-placeholder,
+        body.page-budget input#budgetLimit::-moz-placeholder,
+        body.page-budget input#budgetLimit:-ms-input-placeholder,
+        body.page-budget input#budgetLimit::-ms-input-placeholder {
+            color: #697c75 !important;
+            -webkit-text-fill-color: #697c75 !important;
+            opacity: 1 !important;
+        }
+
+        /* Force summary numbers and transaction amounts to off-white (#EAF6F1).
+           This targets only numeric amount elements so descriptions/dates stay muted. */
+        body.page-budget .big-number,
+        body.page-budget #monthlySpent,
+        body.page-budget #remaining,
+        body.page-budget .transaction-item .transaction-amount {
+            color: #EAF6F1 !important;
+        }
+        
+        /* Match font size of Dashboard stat-number (1.8rem) for Monthly Spent and Remaining Budget */
+        body.page-budget #monthlySpent,
+        body.page-budget #remaining {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        
+        /* Make rupee symbol larger and match the amount styling */
+        body.page-budget .rupee-symbol {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #EAF6F1 !important;
+        }
+        
+        /* Prevent flickering during budget value updates by fixing width and using tabular numbers */
+        body.page-budget .big-number {
+            font-variant-numeric: tabular-nums;
+            min-width: 120px;
+            display: inline-block;
+            will-change: contents;
+        }
+        
+        body.page-budget #monthlySpent,
+        body.page-budget #remaining {
+            font-variant-numeric: tabular-nums;
+            display: inline-block;
+            min-width: 80px;
+            will-change: contents;
+        }
+        
+        /* Prevent layout shift during initial load */
+        body.page-budget .budget-card .big-number {
+            opacity: 1;
+            transition: none !important;
+        }
+
+        /* Budget page: button label text color only (leave backgrounds to global styles).
+           This makes the 'Save' and 'Add Expense' button text appear as #EAF6F1 while
+           preserving the normal .btn-primary background and hover behaviour. */
+        body.page-budget .budget-card .btn-primary,
+        body.page-budget .form-card .btn-primary {
+            color: #EAF6F1 !important;
+        }
+
+        /* Ensure transaction description stays muted but transaction dates are off-white
+           so dates like '12/2/2025' render in the requested color for readability. */
+        body.page-budget .transaction-item .transaction-desc {
+            color: var(--text-muted) !important;
+        }
+        body.page-budget .transaction-item .transaction-date {
+            color: #EAF6F1 !important;
+        }
+
+        /* Ensure rendered transaction amounts stay off-white (#EAF6F1) (override any earlier rules).
+           Keep description and date muted. */
+        body.page-budget .transaction-item .transaction-amount {
+            color: #EAF6F1 !important;
+        }
+
+          /* No page-scoped override for .btn-primary here — leave button styling
+              to the global styles and page-specific rules in `static/css/style.css`. */
+    </style>
+</head>
+<body class="page-budget">
+    <nav class="navbar">
+        <div class="nav-brand" style="cursor: pointer;" onclick="window.location.href='/';">
+            <i class="fas fa-chart-line"></i>
+            <span>My Life Tracker</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li><a href="/habits"><i class="fas fa-fire"></i> Habits</a></li>
+            <li><a href="/tasks"><i class="fas fa-list-check"></i> Tasks</a></li>
+            <li><a href="/budget" class="active"><i class="fas fa-wallet"></i> Budget</a></li>
+            <li><a href="/notes"><i class="fas fa-sticky-note"></i> Notes</a></li>
+            <li><a href="/weather"><i class="fas fa-cloud-sun"></i> Weather</a></li>
+            <li><a href="/stats"><i class="fas fa-chart-bar"></i> Stats</a></li>
+        </ul>
+        <div class="theme-toggle-wrapper">
+            <div class="theme-toggle" id="themeToggle">
+                <span class="theme-toggle-icon moon"><i class="fas fa-moon"></i></span>
+                <span class="theme-toggle-icon sun"><i class="fas fa-sun"></i></span>
+                <div class="theme-toggle-slider"></div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="dashboard">
+        <div class="page-header">
+            <h1><i class="fas fa-wallet"></i> Budget Tracker</h1>
+            <p class="page-subtitle" style="color:var(--text-muted) !important; -webkit-text-fill-color: var(--text-muted) !important; opacity:1 !important; filter:none !important; mix-blend-mode:normal !important;">Track your Budget</p>
+        </div>
+
+        <div class="budget-overview">
+            <div class="budget-card">
+                <h3 id="budgetPageLabel" style="color:#A7CFC2 !important; -webkit-text-fill-color:#A7CFC2 !important; opacity:1 !important; filter:none !important; mix-blend-mode:normal !important;">Monthly Budget</h3>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <!-- Controlled inputBudget: start empty. Do not inject server demo values here. -->
+                    <input type="number" id="budgetLimit" class="input-field" value="" placeholder="Set Budget Limit...">
+                    <button onclick="setBudget()" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </div>
+
+            <div class="budget-card">
+                <h3 style="color:#A7CFC2 !important; -webkit-text-fill-color:#A7CFC2 !important; opacity:1 !important; filter:none !important; mix-blend-mode:normal !important;">Monthly Spent</h3>
+                <p class="big-number"><span class="rupee-symbol">₹</span><span id="monthlySpent">{{ monthly_spent }}</span></p>
+            </div>
+
+            <div class="budget-card remaining">
+                <h3 style="color:#A7CFC2 !important; -webkit-text-fill-color:#A7CFC2 !important; opacity:1 !important; filter:none !important; mix-blend-mode:normal !important;">Remaining Budget</h3>
+                <p class="big-number"><span class="rupee-symbol">₹</span><span id="remaining">{{ remaining }}</span></p>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h2>Add Expense</h2>
+            <div class="form-group">
+                <input type="number" id="amount" placeholder="Amount" class="input-field" step="0.01" min="0">
+                <div id="amountError" style="color:var(--danger); font-size:0.9rem; margin-top:6px; display:none;">Please enter a valid amount</div>
+                <input type="text" id="description" placeholder="Description (optional)" class="input-field">
+                <button onclick="addExpense()" class="btn btn-primary"><i class="fas fa-plus"></i> Add Expense</button>
+            </div>
+        </div>
+
+        <!-- Simplified transaction list below the Add Expense form -->
+        <div id="transactionsList" class="tx-list" style="margin-top:1.5rem; display:flex; flex-direction:column; gap:1rem;">
+            <!-- Rendered transaction cards go here -->
+        </div>
+    </section>
+
+    <!-- Shared app script (charts, theme, monthlyBudget helpers) -->
+    <script src="{{ url_for('static', filename='js/script.js') }}?v={{ range(1, 999999) | random }}"></script>
+    <script>
+
+        async function loadTransactions() {
+            try {
+                const res = await fetch('/api/budget');
+                const data = await res.json();
+                const container = document.getElementById('transactionsList');
+                container.innerHTML = '';
+
+                const transactions = data.transactions || [];
+
+                // Update top summary numbers so page reflects current data after adds/deletes
+                try {
+                    // Compute monthly spent (sum for current month) to keep summary accurate
+                    const now = new Date();
+                    const monthlyTotal = transactions.reduce((s, it) => {
+                        try {
+                            const td = new Date(it.date);
+                            if (td.getFullYear() === now.getFullYear() && td.getMonth() === now.getMonth()) {
+                                return s + (parseFloat(it.amount) || 0);
+                            }
+                        } catch (e) {}
+                        return s;
+                    }, 0);
+                    const total = Math.round(monthlyTotal);
+                    // Prefer client-side monthlyBudget (localStorage) when present as single source of truth
+                    let limit = 0;
+                    try {
+                        if (typeof window !== 'undefined' && window.monthlyBudget !== undefined && window.monthlyBudget !== null) {
+                            limit = Number(window.monthlyBudget) || 0;
+                        } else {
+                            limit = parseFloat(data.limit) || 0;
+                        }
+                    } catch (e) {
+                        limit = parseFloat(data.limit) || 0;
+                    }
+                    const remaining = Math.round(limit - parseFloat(total || 0));
+                    const totalEl = document.getElementById('monthlySpent');
+                    const remEl = document.getElementById('remaining');
+                    const limitEl = document.getElementById('budgetLimitDisplay');
+                    const labelEl = document.getElementById('budgetPageLabel');
+                    
+                    // Only update if values have actually changed to prevent unnecessary reflows
+                    if (totalEl && totalEl.textContent !== String(total)) totalEl.textContent = total;
+                    if (remEl && remEl.textContent !== String(remaining)) remEl.textContent = remaining;
+                    if (limitEl && limitEl.textContent !== String(limit || 0)) limitEl.textContent = (limit || 0);
+                    // Update the "Monthly Budget" label to show the amount
+                    if (labelEl) {
+                        if (limit > 0) {
+                            labelEl.textContent = `Monthly Budget: ₹${limit}`;
+                        } else {
+                            labelEl.textContent = 'Monthly Budget';
+                        }
+                    }
+                } catch (e) {
+                    // ignore update errors
+                }
+
+                if (transactions.length === 0) {
+                    // Intentionally leave the transactions container empty when there are no transactions.
+                    container.innerHTML = '';
+                    return;
+                }
+
+                // Preserve original insertion order so newer transactions appear at the end
+                // Do NOT reverse the array here; transactions are stored in insertion order
+                const txs = transactions.slice();
+                let html = '';
+                txs.forEach((t) => {
+                    const date = new Date(t.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                    const desc = t.description ? escapeHtml(t.description) : 'No Description';
+                    // Use existing .transaction-item and .transaction-info styles for consistent look
+                    // Put the amount into a dedicated .transaction-amount element so we can style
+                    // all numeric amounts (including future ones) via CSS without touching descriptions/dates.
+                    html += `
+                        <div class="transaction-item" data-tx-id="${t.id}">
+                            <div class="transaction-info">
+                                <div class="transaction-amount">₹${Math.round(parseFloat(t.amount))}</div>
+                                <div class="transaction-desc">${desc}</div>
+                                <small class="transaction-date">${date}</small>
+                            </div>
+                            <button onclick="deleteTransaction('${t.id}')" class="btn btn-danger">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>`;
+                });
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                document.getElementById('transactionsList').innerHTML = '<p class="error">Error loading transactions</p>';
+            }
+        }
+
+        async function addExpense() {
+            const amountRaw = document.getElementById('amount').value;
+            const amountStr = amountRaw ? amountRaw.toString().trim() : '';
+            const description = document.getElementById('description').value.trim();
+
+            // If the user hasn't entered anything, silently ignore the click.
+            // Only show an error when the user provided a value that's invalid
+            // (non-numeric or <= 0). This avoids showing "Please enter a valid amount"
+            // when Add Expense is clicked with an empty form.
+            if (amountStr === '') {
+                return;
+            }
+
+            const amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) {
+                const err = document.getElementById('amountError');
+                if (err) {
+                    err.style.display = 'block';
+                    setTimeout(() => { err.style.display = 'none'; }, 2500);
+                }
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/budget', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount, description })
+                });
+
+                if (res.ok) {
+                    document.getElementById('amount').value = '';
+                    document.getElementById('description').value = '';
+                    loadTransactions();
+                    // Silent success: no popup or alert shown
+                } else {
+                    alert('Error adding expense');
+                }
+            } catch (error) {
+                console.error('Error adding expense:', error);
+                alert('Error adding expense');
+            }
+        }
+
+        async function deleteTransaction(id) {
+            // Optimistically remove the transaction from the UI immediately (no confirmation)
+            try {
+                const el = document.querySelector(`[data-tx-id="${id}"]`);
+                if (el && el.parentNode) el.parentNode.removeChild(el);
+            } catch (e) {
+                // ignore DOM removal errors
+            }
+
+            // Send delete request to server; on failure, log but do not show popups
+            try {
+                const res = await fetch(`/api/budget/${id}`, { method: 'DELETE' });
+                if (!res.ok) {
+                    console.error('Error deleting transaction on server', res.status);
+                    // Attempt to reload to recover state
+                    loadTransactions();
+                }
+            } catch (error) {
+                console.error('Error deleting transaction:', error);
+                // Try to reload to ensure UI and storage stay consistent
+                loadTransactions();
+            }
+        }
+
+        async function setBudget() {
+            const raw = (document.getElementById('budgetLimit').value || '').toString().trim();
+
+            // If the user didn't type anything or typed an invalid value, treat Save as setting budget to 0.
+            // Otherwise parse the entered number. Negative values are treated as 0.
+            let limit;
+            if (raw === '') {
+                limit = 0;
+            } else {
+                const parsed = parseFloat(raw);
+                limit = (isNaN(parsed) || parsed < 0) ? 0 : parsed;
+            }
+
+            try {
+                const res = await fetch('/api/budget', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit })
+                });
+
+                if (res.ok) {
+                    // persist to localStorage so dashboard and other pages update quickly
+                    try { localStorage.setItem('monthlyBudget', String(limit)); } catch (e) {}
+                    // update global state and UI immediately
+                    try { window.monthlyBudget = limit; } catch (e) {}
+                    const budgetInput = document.getElementById('budgetLimit');
+                    if (budgetInput) budgetInput.value = '';
+                    // update dashboard/budget labels
+                    try { updateBudgetUI(); } catch (e) {}
+                    // refresh totals and transaction list
+                    loadTransactions();
+                } else {
+                    // keep previous behavior for failures
+                    alert('Error setting budget');
+                }
+            } catch (error) {
+                console.error('Error setting budget:', error);
+                alert('Error setting budget');
+            }
+        }
+
+        // Reset button removed - resetBudget() intentionally removed to simplify UI
+
+        
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Initialize theme toggle
+        function initThemeToggle() {
+            const themeToggle = document.getElementById('themeToggle');
+            if (!themeToggle) return;
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-theme');
+                themeToggle.classList.add('active');
+            }
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-theme');
+                themeToggle.classList.toggle('active');
+                const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+                localStorage.setItem('theme', currentTheme);
+            });
+        }
+
+        initThemeToggle();
+        // Load transactions on page load
+        loadTransactions();
+    </script>
+</body>
+</html>

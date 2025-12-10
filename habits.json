@@ -1,0 +1,30 @@
+{
+  "409d4c85-986a-4358-bc44-627fd3dd6b0c": {
+    "id": "409d4c85-986a-4358-bc44-627fd3dd6b0c",
+    "name": "Morning Run",
+    "frequency": "daily",
+    "completed_dates": [],
+    "days_completed": 0,
+    "created_at": "2025-12-10T05:57:08.938237"
+  },
+  "ec2ac10a-cffe-4084-82fa-024e0642a9f1": {
+    "id": "ec2ac10a-cffe-4084-82fa-024e0642a9f1",
+    "name": "Study",
+    "frequency": "daily",
+    "completed_dates": [
+      "2025-12-10"
+    ],
+    "days_completed": 1,
+    "created_at": "2025-12-10T05:57:12.021124"
+  },
+  "777af2ec-2a7f-41fd-bb0a-7049d265e9d0": {
+    "id": "777af2ec-2a7f-41fd-bb0a-7049d265e9d0",
+    "name": "Gym",
+    "frequency": "daily",
+    "completed_dates": [
+      "2025-12-10"
+    ],
+    "days_completed": 1,
+    "created_at": "2025-12-10T05:57:14.414842"
+  }
+}

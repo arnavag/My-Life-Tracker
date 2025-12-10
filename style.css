@@ -1,0 +1,2627 @@
+/* Prevent flickering during page load and navigation */
+.preload * {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Notes: line-clamp preview and Read More button */
+.note-content.preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 2.6em;
+    max-height: 2.6em;
+    margin-bottom: 1rem;
+    word-break: break-word;
+}
+
+.read-more-btn {
+    position: absolute;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    background: none;
+    color: #29AB87;
+    border: none;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    display: none;
+}
+
+.note-card {
+    position: relative;
+    min-height: 160px;
+}
+
+.note-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.note-modal-content {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 500px;
+    width: 90vw;
+    color: var(--text-main);
+    position: relative;
+}
+
+.close-modal {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 2rem;
+    color: #29AB87;
+    cursor: pointer;
+}
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Prevent all links and anchors from being draggable */
+a {
+    -webkit-user-drag: none !important;
+    -khtml-user-drag: none !important;
+    -moz-user-drag: none !important;
+    -o-user-drag: none !important;
+}
+
+:root {
+    /* Dark green theme color system */
+    --bg-main: #0F1F1B;            /* Main app background (body) */
+    --card-bg: #16352D;            /* Normal cards & containers */
+    --stat-viridian-bg: #33665e;   /* Top 4 summary stat cards (primary action color) */
+    --primary: #29AB87;            /* Primary action color (keep existing primary) */
+    --primary-rgb: 41,171,135;     /* primary RGB for rgba() */
+    --danger: #17876D;             /* Danger (delete) - delete button base color */
+    --danger-rgb: 23,135,109;
+    --text-main: #EAF6F1;          /* Main text color */
+    --text-muted: #A7CFC2;         /* Muted/secondary text */
+    --nav-bg: #102A24;             /* Navbar background */
+    --nav-inactive: #A7CFC2;       /* Navbar inactive item color */
+    --border-alpha: rgba(255,255,255,0.08);
+    
+    /* GREEN DARK MODE - Chart color system (single source of truth) */
+    --chart-completed: var(--primary);    /* Completed state matches dashboard stat icon color */
+    --chart-pending: #4a5050;      /* Pending state - updated to dashboard request */
+    --chart-outline: #EAF6F1;      /* Off-white outline for all charts */
+    --legend-box-size: 14px;      /* unified size for legend color boxes */
+    --tooltip-box-size: 14px;     /* size for the canvas tooltip color square (hover) */
+    
+    /* GREEN DARK MODE - Legend color fills (solid blocks) */
+    --legend-completed: #10B981;   /* Emerald Green for legend */
+    --legend-pending: #4a5050;     /* Pending legend swatch color (dashboard) */
+    /* Accent used for habits (daily/weekly) and Add Habit button — matches pasted color */
+    --habit-accent: var(--stat-viridian-bg);
+    /* Brighter pressed/highlight color for habits (matches provided small swatch) */
+    --habit-accent-pressed: #00C389;
+    /* Darker variants used for stronger highlights in Green Dark Mode */
+    --primary-dark: #1f8f6a; /* darker shade of --primary (#29AB87) */
+    --habit-accent-pressed-dark: #009f6f; /* darker shade of --habit-accent-pressed (#00C389) */
+}
+
+body {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
+    min-height: 100vh;
+}
+
+/* ===== Cursor policy: I-beam (text) ONLY on editable fields =====
+   Make the default cursor the arrow for all non-editable UI so the I-beam
+   never appears on static text, headings, labels, cards, legends, buttons, etc.
+   Then explicitly enable the text cursor for form controls and contenteditable
+   elements. We use !important to ensure this policy wins over component-level
+   rules that previously set pointer or text cursors.
+*/
+/* Global default: force arrow cursor everywhere first */
+body * {
+    cursor: default !important;
+}
+
+/* Editable targets: inputs, textareas and contenteditable elements should show I-beam */
+input[type="text"],
+input[type="password"],
+input[type="search"],
+input[type="email"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+input:not([type]),
+textarea,
+[contenteditable],
+[contenteditable="true"] {
+    cursor: text !important;
+}
+
+/* Also ensure our input-field utility keeps the I-beam when applicable */
+.input-field { cursor: text !important; }
+
+/* Keep select/option and interactive controls as default arrow unless explicitly set
+   (user requested no hand/pointer or I-beam on non-editable UI). */
+
+/* ===== Interactive elements: pointer only when element is clickable =====
+    This block explicitly enables the hand/pointer cursor for known interactive
+    controls. If an element is intentionally non-clickable (e.g. has
+    pointer-events:none or no href), it will not receive pointer events and
+    the cursor will fall back to the underlying element (default arrow).
+    Use the .clickable utility or role="button" when needed for custom
+    clickable elements to ensure they show a pointer. */
+button,
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.action-btn,
+a[href],
+    theme-toggle,
+    theme-toggle *,
+select,
+input[type="checkbox"],
+input[type="radio"],
+.task-card.clickable,
+.task-card.clickable *,
+.chart-legend .legend-label.clickable,
+.chart-legend .legend-swatch.clickable,
+[role="button"],
+.nav-links a {
+     cursor: pointer !important;
+}
+
+/* If you want a generic utility to force pointer on a custom element, use .clickable */
+.clickable { cursor: pointer !important; }
+
+/* ============ NAVBAR ============ */
+.navbar {
+    background: var(--nav-bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.22);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+/* Dark-mode: add subtle black shadow behind doughnut/pie rings (applies to canvas rendering)
+   and a matching shadow for legend swatches. Light theme remains unchanged. */
+body:not(.light-theme) .doughnut-canvas {
+    /* drop-shadow keeps the chart fills flat but adds depth behind the ring */
+    /* ensure the canvas rendering area doesn't clip the shadow */
+    display: block;
+}
+
+body:not(.light-theme) .chart-legend .legend-swatch {
+    /* No outline for legend swatches in dark mode — keep fills flat.
+       Shadows and outlines are explicitly removed so tooltip/canvas
+       swatches and DOM header swatches match exactly. */
+    box-shadow: none !important;
+    border: none !important;
+    outline: none !important;
+}
+
+/* Remove legend swatch shadow for doughnut cards to prevent any external shadow artefacts */
+body:not(.light-theme) .chart-card.no-external-shadow .chart-legend .legend-swatch {
+    box-shadow: none !important;
+}
+
+/* Doughnut wrapper and concentric radial halo (Green Dark Mode only)
+   This implementation uses a centered radial-gradient to create a smooth
+   halo that follows the donut ring. The shadow element sits beneath the
+   canvas and is clipped by the wrapper so it doesn't spill onto legend/text. */
+.doughnut-wrapper {
+    position: relative;
+    display: block; /* allow width/height to match the canvas/container */
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* clip halo to the chart area so it doesn't reach legend/text */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* shadow element: invisible by default, only painted in dark mode via the selector below */
+.doughnut-shadow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    /* occupy full chart area so the radial gradient centers perfectly
+       and remains circular even when the canvas scales responsively */
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    pointer-events: none;
+    background: transparent;
+    z-index: 0; /* keep beneath the canvas (canvas will be z-index:1) */
+    opacity: 0;
+}
+
+/* Ensure the canvas sits above the halo */
+.doughnut-wrapper canvas,
+.doughnut-wrapper .doughnut-canvas {
+    position: relative;
+    z-index: 2;
+    background: transparent;
+}
+
+@keyframes ring-shadow-appear {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.94);
+    }
+    60% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.03);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Paint the radial halo only in Green Dark Mode. The radial-gradient is tuned
+   to be darkest just outside the ring's outer edge and then fade smoothly
+   into transparent to match the card background. Use very dark neutral tones
+   with a hint of green to match the theme without adding color bias to segments. */
+body:not(.light-theme) .doughnut-shadow {
+    /* Create a neutral, circular contact shadow that peaks near the
+       donut's outer edge. We keep the inner area fully transparent so
+       the hole doesn't get darkened. The gradient stops are tuned
+       relative to the canvas radius; Chart.js uses a 62% cutout so the
+       stronger band is positioned slightly outside that to sit under
+       the ring's outer edge. */
+    background: radial-gradient(circle at center,
+        transparent 0%,
+        transparent 64%,
+        rgba(8,12,10,0.72) 70%,  /* near-outer edge dark band */
+        rgba(8,12,10,0.64) 75%,
+        rgba(8,12,10,0.34) 86%,
+        rgba(8,12,10,0.12) 92%,
+        transparent 100%);
+    /* subtle blur softens the band into a smooth halo with no hard edges */
+    filter: blur(10px);
+    animation: ring-shadow-appear 2s ease forwards;
+}
+
+/* Strict: hide any external halo/shadow elements for doughnut cards in Green Dark Mode.
+    All external visual shadowing is removed — internal ring shading is provided by the
+    canvas plugin so we keep the card surface perfectly flat. */
+body:not(.light-theme) .doughnut-shadow { display: none !important; }
+
+/* Suppress elevated box-shadow for chart cards that contain doughnuts so the card
+    background remains flat and clean (dark-mode only). Other chart-cards remain
+    unaffected. */
+/* Removed: body:not(.light-theme) .chart-card.no-external-shadow { box-shadow: none !important; }
+   Now chart cards will use the global #4a5050 shadow */
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-main);
+    cursor: pointer;
+    pointer-events: auto;
+    /* Prevent text selection on My Life Tracker */
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+}
+
+/* When Green Dark Mode applies and we want the logo to be static (no hover
+   color changes), this class is added by JS to suppress hover styling. */
+body:not(.light-theme) .nav-brand.gd-no-hover,
+body:not(.light-theme) .nav-brand.gd-no-hover * {
+    color: #A7CFC2 !important;
+    text-decoration: none !important;
+}
+
+/* Ensure the nav-brand (logo text + icon) appears identically across all pages
+   and nav states in Green Dark Mode. This forces color/decoration and prevents
+   hover/active states from changing appearance so the brand remains consistent.
+   It intentionally only targets the brand anchor, not the other nav links. */
+body:not(.light-theme) .nav-brand,
+body:not(.light-theme) .nav-brand * {
+    color: #A7CFC2 !important;
+    text-decoration: none !important;
+    text-shadow: none !important;
+}
+body:not(.light-theme) .nav-brand:hover,
+body:not(.light-theme) .nav-brand:active,
+body:not(.light-theme) .nav-brand:focus {
+    color: #A7CFC2 !important;
+    text-decoration: none !important;
+}
+
+.nav-brand i {
+    font-size: 1.8rem;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: var(--nav-inactive);
+    font-weight: 500;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+}
+
+.nav-links a:hover { color: var(--primary); }
+.nav-links a.active { color: var(--primary); background: transparent; }
+
+/* clock widget removed — styles cleaned up below where necessary */
+
+/* ============ DASHBOARD ============ */
+.dashboard {
+    /* restore standard top padding so spacing above the first box matches other gaps */
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.page-header {
+    background: var(--card-bg);
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.22);
+}
+
+.page-header h1 {
+    font-size: 2rem;
+    color: var(--text-main); /* off-white for contrast */
+    margin-bottom: 0.5rem;
+}
+
+.page-header p {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+.greeting-card {
+    background: var(--card-bg);
+    color: var(--text-main);
+    /* match quick-actions sizing: use larger vertical/horizontal padding so box height matches */
+    padding: 2rem 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    position: relative; /* keep for absolutely-positioned clock inside */
+    margin-bottom: 2rem; /* match the vertical spacing used elsewhere */
+}
+
+/* spacer to keep layout flow when greeting-card was fixed — removed along with clock widget */
+
+/* constrain chart canvas heights so doughnuts stay a normal size */
+.chart-card canvas {
+    /* Default: make charts fill the card width and keep a readable rectangle aspect. */
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100%;
+    display: block;
+    margin: 0.8rem 0 0 0;
+    aspect-ratio: 16 / 9; /* rectangular by default for line/bar charts */
+    /* ensure adequate vertical space so Chart.js doesn't compress lines to the bottom */
+    min-height: 300px;
+    height: 300px !important;
+}
+
+/* Doughnut charts (dashboard) should remain square/circular */
+#habitProgressChart, #taskProgressChart {
+    aspect-ratio: 1 / 1;
+    max-width: 320px; /* medium size */
+    margin: 0.8rem auto 0 auto;
+    width: 100%;
+}
+
+/* Chart container for fixed-height wrappers used on dashboard doughnuts */
+.chart-container {
+    --chart-size: 300px; /* medium default size for doughnuts */
+    min-height: var(--chart-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+/* Force doughnut canvases to be perfect squares but allow them to scale down on narrow screens */
+.chart-container canvas {
+    width: min(var(--chart-size), 100%) !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1;
+    max-width: 100%;
+    display: block;
+    box-sizing: border-box;
+    margin: 0 auto;
+}
+
+.greeting-card h2 {
+    font-size: 1.4rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Greeting row: left = greeting, right = time block */
+.greeting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.greeting-content { flex: 1; }
+
+.time-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 160px;
+}
+
+.time-block .time-display {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.time-block .date-display {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.time-block .time-period {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+    letter-spacing: 0.06em;
+}
+
+/* Responsive: stack on small screens */
+@media (max-width: 768px) {
+    .greeting-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .time-block {
+        align-self: stretch;
+        text-align: left;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .time-block .time-period { margin-top: 0; }
+}
+
+/* ============ STAT CARDS ============ */
+.quick-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--card-bg);
+    border-radius: 15px;
+    padding: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    /* normalize to chart-card shadow */
+    /* base ambient shadow - keep this as the constant foundation */
+    box-shadow: var(--global-shadow);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    color: var(--text-main);
+    /* Allow text selection in stat cards */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+.stat-card * {
+    /* Allow text selection on all stat card children */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+.stat-card:hover {
+    /* Preserve the base ambient shadow and add a subtle stacked lift/glow on hover.
+       This stacks on top of the existing shadow instead of replacing it so depth
+       remains consistent. Do NOT change size, radius, timing or colors. */
+    box-shadow: var(--global-shadow), 0 8px 20px rgba(51,102,94,0.06) !important;
+}
+
+/* Dashboard stat cards hover: slightly darker solid shade for visual feedback */
+
+
+/* Specific Viridian summary cards (top 4) - solid background, white text/icons
+   Use this class only on the four summary stat cards so other .stat-card usages
+   remain unchanged. Removes any gradient by explicitly setting a solid color. */
+.stat-viridian {
+    background-color: var(--card-bg); /* Match welcome box color */
+    color: var(--text-main); /* ensure text defaults to off-white */
+}
+.stat-viridian .stat-icon,
+.stat-viridian .stat-icon i {
+    color: var(--primary); /* Match stats page icon color */
+}
+/* ======================= Dashboard summary stat cards =======================
+   Force the base ambient shadow to remain identical in all interaction states
+   (hover, focus, active) for the top-row summary stat cards only. This
+   preserves depth consistency while allowing other .stat-card usages to keep
+   their own hover behavior if defined elsewhere. Do NOT change background,
+   transform, size, radius or animation timing.
+*/
+/* Target the specific summary card class used on the dashboard: .stat-viridian */
+body:not(.light-theme) .stat-viridian,
+body:not(.light-theme) .stat-card.stat-viridian,
+.stat-viridian.stat-card {
+    box-shadow: var(--global-shadow) !important;
+}
+
+/* Ensure interaction states preserve the exact same shadow and disable any
+   accidental transform/outline modifications that could visually replace it. */
+body:not(.light-theme) .stat-viridian:hover,
+body:not(.light-theme) .stat-viridian:focus,
+body:not(.light-theme) .stat-viridian:active,
+body:not(.light-theme) .stat-card.stat-viridian:hover,
+body:not(.light-theme) .stat-card.stat-viridian:focus,
+body:not(.light-theme) .stat-card.stat-viridian:active {
+    box-shadow: var(--global-shadow) !important;
+    transform: none !important;
+    outline: none !important;
+    /* keep background identical to normal state */
+    background: var(--card-bg) !important;
+}
+
+.stat-viridian .stat-content h3,
+.stat-viridian .stat-number {
+    color: var(--text-main); /* force off-white for headings and numbers */
+}
+/* keep hover feedback but preserve white text */
+.dashboard .quick-stats .stat-viridian:hover {
+    /* For the four non-clickable summary stat cards, do NOT change
+       background, text color, transform or shadow on hover. They
+       are visually static and should not present clickable affordances. */
+    background: var(--card-bg) !important;
+    color: var(--text-main) !important;
+    transform: none !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important; /* match base shadow */
+}
+
+/* Keep stat-viridian text-decoration and suppress default focus outline when appropriate */
+.stat-viridian { text-decoration: none; }
+
+/* ------------------ Make the top summary cards non-clickable ------------------
+   Keep markup unchanged (they are anchors) and make them fully interactive with normal hover effects. */
+.quick-stats a.stat-viridian {
+    /* Non-clickable cards but allow text selection */
+    pointer-events: auto !important;
+    cursor: default !important;
+    /* Allow text selection on anchor elements */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+.quick-stats a.stat-viridian:hover {
+    /* Allow normal hover effects */
+    transform: translateY(-4px) !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+}
+.quick-stats a.stat-viridian:focus,
+.quick-stats a.stat-viridian:focus-visible {
+    outline: 2px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+/* ------------------------------------------------------------------------------ */
+
+/* Green Dark Mode: cursor UX for stat card text and pie legend labels
+   - Show text I-beam cursor when hovering stat titles and numbers
+   - Show text I-beam cursor when hovering legend labels/squares
+   - Preserve non-clickable behavior (clicks are prevented by JS); this
+     only changes the cursor/hover affordance and applies in dark mode.
+*/
+body:not(.light-theme) .quick-stats a.stat-viridian { 
+    pointer-events: auto !important;
+    /* Allow text selection in stat cards */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+body:not(.light-theme) .quick-stats a.stat-viridian *,
+body:not(.light-theme) .quick-stats a.stat-viridian .stat-content,
+body:not(.light-theme) .quick-stats a.stat-viridian .stat-icon {
+    /* Allow text selection on all children */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    pointer-events: auto !important;
+}
+/* Ensure non-editable stat card text and chart legend labels do NOT show the I-beam.
+   Use the default arrow for static text; interactive elements will explicitly
+   opt-in to the pointer cursor below. */
+body:not(.light-theme) .quick-stats a.stat-viridian .stat-content h3,
+body:not(.light-theme) .quick-stats a.stat-viridian .stat-number {
+    /* Allow text selection */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    pointer-events: auto !important;
+}
+
+body:not(.light-theme) .chart-legend .legend-label,
+body:not(.light-theme) .chart-legend .legend-swatch {
+    cursor: default !important;
+}
+
+/* Ensure the parent anchor doesn't show the not-allowed cursor when hovering text */
+body:not(.light-theme) .quick-stats a.stat-viridian:hover { cursor: default !important; }
+
+.stat-icon {
+    font-size: 2.5rem;
+    display: flex;
+    align-items: center;
+    /* Enable pointer events for icon */
+    pointer-events: auto !important;
+}
+
+.stat-content {
+    /* Enable pointer events and text selection */
+    pointer-events: auto !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+.stat-content * {
+    /* Allow text selection on all children */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    pointer-events: auto !important;
+}
+
+.stat-content h3 {
+    font-size: 0.95rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+    /* Allow text selection */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    pointer-events: auto !important;
+}
+
+/* Ensure the dashboard budget label is always visible and stacked above the amount
+   even if other styles or scripts attempt to modify the parent. This forces the
+   label to render as a block above the amount and ensures contrast in dark mode. */
+#dashboardBudgetLabel {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-main) !important;
+    margin: 0;
+    line-height: 1;
+}
+
+/* Force the Budget stat card to stack label above amount regardless of other styles
+   Target the budget anchor specifically so only this card is affected. This keeps
+   the icon-to-content horizontal layout while arranging the content vertically. */
+.quick-stats a.stat-viridian:nth-child(3) .stat-content {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+}
+
+.quick-stats a.stat-viridian:nth-child(3) .stat-content h3 {
+    margin: 0 !important;
+}
+
+.quick-stats a.stat-viridian:nth-child(3) .stat-number {
+    margin: 0 !important;
+}
+
+.stat-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    /* Allow text selection */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    pointer-events: auto !important;
+}
+
+/* ============ CHARTS ============ */
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.chart-card {
+    background: var(--card-bg); /* Match welcome box color */
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.6); /* Green Dark Mode: enhanced floating effect shadow */
+}
+
+.chart-card { overflow: hidden; }
+
+.chart-card h3 {
+    margin-bottom: 1rem;
+    color: var(--text-main); /* off-white headings inside chart cards */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Chart header with custom right-aligned legend */
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.chart-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-main); /* match section title off-white */
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* Ensure the header title and custom legend are perfectly vertically aligned */
+.chart-header h3 {
+    margin: 0; /* remove any default margins that can offset alignment */
+    display: flex;
+    align-items: center; /* keep icon and title vertically centered */
+}
+
+.chart-legend {
+    display: inline-flex; /* keep legend compact and inline with title */
+    align-items: center;   /* vertically center the swatch and label */
+    margin: 0; /* ensure no extra margins push it down */
+    overflow: visible;     /* ensure shadow from child swatches is not clipped */
+}
+
+.legend-swatch {
+    /* Use a single source-of-truth size so DOM swatches and canvas tooltip
+       color boxes can be kept pixel-identical. This value is read by JS
+       and by Chart.js tooltip options at runtime. */
+    width: var(--legend-box-size);
+    height: var(--legend-box-size);
+    border-radius: 0; /* Perfect square shape */
+    background-color: var(--legend-completed); /* Solid fill for completed */
+    margin-right: 8px;
+    display: inline-block;
+    flex: 0 0 var(--legend-box-size);
+    /* No outline: keep the swatch a flat color block */
+    border: none;
+    box-sizing: border-box;
+    padding: 0;               /* ensure inner area occupies full box */
+    overflow: visible;        /* allow shadow to show outside bounds */
+    background-clip: padding-box;
+    border-radius: 3px;       /* slight rounding to help shadow show */
+    /* Dramatic multi-layer black shadow for maximum visibility */
+    box-shadow: 
+        0 12px 40px rgba(0, 0, 0, 1),
+        0 8px 28px rgba(0, 0, 0, 1),
+        0 4px 16px rgba(0, 0, 0, 1),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.3) !important;
+    position: relative; /* establish stacking context for pseudo-element shadow */
+}
+
+/* Extra visible shadow layer rendered via pseudo-element to ensure visibility
+   regardless of stacking context or parent clipping */
+.legend-swatch::after {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: -8px;
+    right: -8px;
+    bottom: -8px;
+    border-radius: 6px;
+    pointer-events: none;
+    /* Strong black ambient shadow */
+    box-shadow: 0 12px 42px rgba(0,0,0,0.95), 0 8px 28px rgba(0,0,0,0.9);
+    z-index: 0; /* render in same stacking context so the shadow is visible */
+}
+
+/* Ensure legend swatches never show hover/focus outlines - but keep the shadow */
+.chart-legend .legend-swatch:hover,
+.chart-legend .legend-swatch:focus,
+.chart-legend .legend-swatch:active {
+    outline: none !important;
+    /* ensure interactive states do not reintroduce an outline */
+    border: none !important;
+}
+
+.legend-label { 
+    background: linear-gradient(135deg, var(--primary) 0%, var(--text-main) 50%, var(--habit-accent-pressed) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 600;
+}
+
+/* Pending legend swatch - solid fill */
+.legend-swatch.pending-swatch { 
+    background-color: var(--legend-pending); /* Solid fill for pending */
+    margin-left: 10px; 
+    border: none; /* no outline */
+    padding: 0;               /* keep strict sizing */
+    overflow: visible;        /* allow shadow to show outside bounds */
+    box-sizing: border-box;
+    border-radius: 3px;       /* slight rounding to help shadow show */
+    /* Dramatic multi-layer black shadow for maximum visibility - same as completed */
+    box-shadow: 
+        0 12px 40px rgba(0, 0, 0, 1),
+        0 8px 28px rgba(0, 0, 0, 1),
+        0 4px 16px rgba(0, 0, 0, 1),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.3) !important;
+    position: relative;
+}
+
+.legend-swatch.pending-swatch::after {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: -8px;
+    right: -8px;
+    bottom: -8px;
+    border-radius: 6px;
+    pointer-events: none;
+    box-shadow: 0 12px 42px rgba(0,0,0,0.95), 0 8px 28px rgba(0,0,0,0.9);
+    z-index: 0;
+}
+
+/* Stats page: Remove shadows from legend swatches and apply clean Dashboard styling */
+body.page-stats .chart-legend .legend-swatch,
+body.page-stats .chart-legend .legend-swatch.pending-swatch {
+    box-shadow: none !important;
+    border: none !important;
+    outline: none !important;
+    overflow: hidden !important;
+    border-radius: 3px !important;
+    background-color: #29AB87 !important;
+    margin-right: 2px !important;
+}
+
+/* Stats page: Make legend label text off-white */
+body.page-stats .chart-legend .legend-label {
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #F5F5F5 !important;
+    background-clip: unset !important;
+    color: #F5F5F5 !important;
+}
+
+/* Remove pseudo-element shadow for Stats page legend swatches */
+body.page-stats .chart-legend .legend-swatch::after,
+body.page-stats .chart-legend .legend-swatch.pending-swatch::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* ============ FORMS & INPUTS ============ */
+.form-card {
+    background: var(--card-bg); /* form sections on dashboard */
+    padding: 1.5rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+
+.form-card h2 {
+    margin-bottom: 1rem;
+    color: var(--text-main);
+}
+
+.form-group {
+    display: grid;
+    gap: 1rem;
+}
+
+.input-field {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-alpha);
+    border-radius: 10px;
+    font-size: 1rem;
+    font-family: inherit;
+    transition: all 0.3s;
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
+}
+
+textarea.input-field {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Ensure single-line inputs inside form groups have an identical minimum height
+   so the 'Enter a Task...' and 'Enter Habit Name...' inputs render pixel-consistent
+   across pages and themes. Use min-height so taller content (e.g. large fonts)
+   can still expand if needed. */
+.form-group input.input-field {
+    min-height: 48px;
+    height: auto; /* allow vertical grow for accessibility */
+    line-height: 1.2;
+}
+
+/* Consistent placeholder color for all input fields in dark mode */
+.input-field::placeholder {
+    color: rgba(255,255,255,0.35) !important;
+    opacity: 1 !important; /* ensure consistent opacity across browsers */
+}
+
+/* Browser-specific placeholder selectors for maximum compatibility */
+.input-field::-webkit-input-placeholder {
+    color: rgba(255,255,255,0.35) !important;
+    opacity: 1 !important;
+}
+
+.input-field::-moz-placeholder {
+    color: rgba(255,255,255,0.35) !important;
+    opacity: 1 !important;
+}
+
+.input-field:-ms-input-placeholder {
+    color: rgba(255,255,255,0.35) !important;
+    opacity: 1 !important;
+}
+
+.input-field::-ms-input-placeholder {
+    color: rgba(255,255,255,0.35) !important;
+    opacity: 1 !important;
+}
+
+/* ============ BUTTONS ============ */
+.btn {
+    padding: 0.85rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: var(--text-main);
+}
+
+.btn-primary:hover {
+    box-shadow: 0 8px 20px rgba(var(--primary-rgb), 0.35);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-alpha);
+}
+
+.btn-secondary:hover {
+    background: rgba(255,255,255,0.02);
+}
+
+.btn-success {
+    background: var(--primary);
+    color: var(--text-main);
+}
+
+/* Completed state highlight for habit 'Done' state */
+.btn-done, button.btn-done {
+    /* Completed state styling: solid color like Delete button */
+    background: #33665e !important;
+    color: var(--text-main) !important; /* ensure readable text */
+    border: none !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+button.btn-done:hover {
+    /* No pop-up on hover for Completed button: keep idle position and shadow */
+    transform: none !important;
+    box-shadow: none !important;
+    background: #3d7a6f !important;
+}
+
+.btn-danger {
+    /* Square Delete button with rounded edges - icon only */
+    background: #5A6161;
+    color: #F1F7F6;
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 1rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: none;
+    transition: all 0.3s ease;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.btn-danger i,
+.btn-danger svg {
+    color: #F1F7F6;
+    font-size: 1.1rem;
+}
+
+.btn-danger:hover {
+    background: #4A5050;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.btn-danger:active,
+.btn-danger[aria-pressed="true"] {
+    background: #3B4444;
+    transform: translateY(0);
+}
+
+/* Green Dark Mode: Make Delete button match the dark theme */
+body:not(.light-theme) .btn-danger {
+    background: #5A6161 !important;
+    color: #F1F7F6 !important;
+    border-color: #5A6161 !important;
+}
+
+body:not(.light-theme) .btn-danger:hover {
+    background: #4A5050 !important;
+}
+
+body:not(.light-theme) .btn-danger:active,
+body:not(.light-theme) .btn-danger[aria-pressed="true"] {
+    background: #3B4444 !important;
+}
+
+.btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+/* Habits page: Match the reference image styling for action buttons */
+body.page-habits .habit-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Mark Done button - default state (not completed) - outline style */
+body.page-habits .habit-actions .btn-secondary {
+    background: transparent !important;
+    color: var(--text-main) !important;
+    border: 1.5px solid rgba(255,255,255,0.2) !important;
+    padding: 0.5rem 1.5rem !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    width: 165px !important;
+    max-width: 165px !important;
+    min-width: 165px !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    line-height: 1.5 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+}
+
+/* Mark Done button - completed state (green/teal background) */
+body.page-habits .habit-actions .btn-done {
+    background: #507a72 !important;
+    color: var(--text-main) !important;
+    border: 1.5px solid rgba(255,255,255,0.2) !important;
+    padding: 0.65rem 1.5rem !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    width: 165px !important;
+    max-width: 165px !important;
+    min-width: 165px !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    line-height: 1.5 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+}
+
+/* Delete button - grey background matching the reference */
+body.page-habits .habit-actions .btn-danger {
+    background: #5A6161 !important;
+    color: var(--text-main) !important;
+    border: none !important;
+    padding: 0.85rem 1.8rem !important;
+    border-radius: 16px !important;
+    box-shadow: none !important;
+    min-width: 140px;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+}
+
+body.page-habits .habit-actions .btn i { 
+    color: var(--text-main) !important; 
+    font-size: 1rem !important;
+}
+
+body.page-habits .habit-actions .btn-secondary:hover {
+    background: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.3) !important;
+}
+
+body.page-habits .habit-actions .btn-done:hover {
+    background: #3d7a6f !important;
+}
+
+body.page-habits .habit-actions .btn-danger:hover {
+    background: #6A7171 !important;
+}
+
+body.page-habits .habit-actions .btn:disabled {
+    opacity: 0.7 !important;
+    cursor: default !important;
+}
+
+/* Tasks checkbox visuals are controlled further down to keep default compact sizing */
+
+/* Frequency buttons removed: This app no longer uses daily/weekly frequency selectors.
+   Related styles were removed to avoid unused CSS and accidental visuals. */
+
+/* ============ LISTS ============ */
+.tasks-list,
+.habits-list,
+.transactions-list,
+.notes-grid {
+    margin-top: 2rem;
+}
+
+.transaction-item {
+    background: var(--card-bg);
+    padding: 1.2rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+}
+
+.transaction-info h4 {
+    margin: 0 0 0.3rem 0;
+    color: var(--text-main);
+}
+
+.transaction-info p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.transaction-info small { color: var(--text-muted); }
+
+.transaction-info small {
+    color: var(--text-muted);
+}
+.task-checkbox {
+    /* Larger, consistent checkbox sizing used across the app
+       (keeps aspect ratio instead of scaling). Use inline-flex so the
+       check icon can be perfectly centered. */
+    width: 27px;
+    height: 27px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.task-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+}
+
+.task-title {
+    font-size: 1rem;
+    color: var(--dark);
+}
+
+.habit-card {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+}
+
+/* Task card styling — mirror habit-card but scoped to tasks list */
+.task-card {
+    background: var(--card-bg);
+    padding: 1.2rem 1rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+    display: block;
+}
+.task-card .task-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.task-card .task-left { flex: 0 0 auto; }
+.task-card .task-center { flex: 1 1 auto; }
+.task-card .task-right { flex: 0 0 auto; }
+.task-card.clickable:hover {
+    /* Only lift task cards that are explicitly clickable.
+       Regular task list items should not pop on hover. */
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.55);
+}
+.task-card .task-title {
+    font-size: 1rem;
+    color: var(--text-main);
+    font-weight: 600;
+}
+.task-card .task-checkbox {
+    width: 27px;
+    height: 27px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Native/browser accent-color rules removed — checkbox visuals are fully
+   controlled by the custom appearance rules below to avoid cross-browser
+   conflicts with appearance: none. */
+
+/* Custom visual: make the checkmark (tick) the exact Add Task color while
+   keeping the unchecked box neutral. We only apply this in Green Dark Mode
+   on the Tasks page and we preserve the checkbox size. This is a progressive
+   enhancement — browsers that respect accent-color will still work. */
+/* Custom checkbox visuals for Tasks & Habits in Green Dark Mode
+   - Override native appearance entirely to guarantee consistent visuals
+   - When checked: the box fill becomes the Add Task hex (#33665e)
+     and the tick uses the exact same hex (per strict request)
+   - When unchecked: dark neutral background with a light border
+   - Apply only in Green Dark Mode and only on Tasks/Habits pages
+*/
+body.page-tasks:not(.light-theme) .tasks-list .task-card .task-checkbox,
+body.page-habits:not(.light-theme) .habit-card .task-checkbox,
+body.page-habits:not(.light-theme) .habit-card input[type="checkbox"],
+body.page-tasks:not(.light-theme) input[type="checkbox"].task-checkbox {
+    /* Square checkbox with rounded edges matching delete button */
+    width: 30px;
+    height: 30px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent !important;
+    border: 1.5px solid rgba(255,255,255,0.2) !important;
+    border-radius: 8px !important; /* smaller radius for square checkbox look */
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    position: relative;
+    transition: background-color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease, border-color 0.12s ease;
+}
+
+/* Focus ring for accessibility — subtle */
+body.page-tasks:not(.light-theme) .tasks-list .task-card .task-checkbox:focus,
+body.page-habits:not(.light-theme) .habit-card .task-checkbox:focus {
+    /* subtle focus ring for accessibility */
+    outline: 3px solid rgba(255,255,255,0.06);
+    outline-offset: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+
+/* Hover state: subtle brightness/soft shadow without changing tick shape */
+body.page-tasks:not(.light-theme) .tasks-list .task-card .task-checkbox:hover,
+body.page-habits:not(.light-theme) .habit-card .task-checkbox:hover {
+    background: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.3) !important;
+}
+
+/* Tick element (SVG) that will be shown when checked. Stroke color set to exact Add Task hex */
+body.page-tasks:not(.light-theme) .tasks-list .task-card .task-checkbox::after,
+body.page-habits:not(.light-theme) .habit-card .task-checkbox::after,
+body.page-tasks:not(.light-theme) input[type="checkbox"].task-checkbox::after {
+    /* White tick centered inside the box. We use background-image with an
+       inline SVG whose stroke is pure white (#FFFFFF). The pseudo-element is
+       not absolutely scaled—it's sized relative to the checkbox so the
+       aspect ratio remains intact and doesn't get squished. */
+    content: "";
+    display: inline-block;
+    width: 60%; /* tick occupies ~60% of the box (meets 60-70% requirement) */
+    height: 60%;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    opacity: 0; /* hidden when unchecked */
+    transition: opacity 0.12s ease;
+    /* Inline SVG uses a rounded stroke to avoid corner artifacts */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M5 13 L9 17 L19 7' fill='none' stroke='%23FFFFFF' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+/* Checked state: fill becomes Add Task hex and tick is revealed (tick stroke also #33665e) */
+body.page-tasks:not(.light-theme) .tasks-list .task-card .task-checkbox:checked,
+body.page-habits:not(.light-theme) .habit-card .task-checkbox:checked,
+body.page-tasks:not(.light-theme) input[type="checkbox"].task-checkbox:checked {
+    /* Checked: solid teal/green fill matching Add Habit button color */
+    background: #507a72 !important; /* lighter teal to match Add Habit button exactly */
+    border: 1.5px solid rgba(255,255,255,0.2) !important; /* keep same grey outline as unchecked */
+}
+
+body.page-tasks:not(.light-theme) .tasks-list .task-card .task-checkbox:checked::after,
+body.page-habits:not(.light-theme) .habit-card .task-checkbox:checked::after,
+body.page-tasks:not(.light-theme) input[type="checkbox"].task-checkbox:checked::after {
+    opacity: 1; /* reveal tick without scaling to avoid distortion */
+}
+
+/* Unchecked explicit styling - transparent with visible outline */
+body.page-tasks:not(.light-theme) .tasks-list .task-card .task-checkbox:not(:checked),
+body.page-habits:not(.light-theme) .habit-card .task-checkbox:not(:checked),
+body.page-tasks:not(.light-theme) input[type="checkbox"].task-checkbox:not(:checked) {
+    background: transparent !important;
+    border: 1.5px solid rgba(255,255,255,0.2) !important;
+}
+
+/* Fallback: apply the same consistent custom checkbox styling to all
+   native checkboxes in Green Dark Mode unless an element opts out by
+   using the .no-custom-checkbox utility class. This keeps the UI
+   consistent for 'yes / no' cards and other checkboxes. */
+body:not(.light-theme) input[type="checkbox"]:not(.no-custom-checkbox) {
+    width: 27px;
+    height: 27px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--card-bg) !important;
+    border: 1px solid #000 !important;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    position: relative;
+    transition: background-color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+body:not(.light-theme) input[type="checkbox"]:not(.no-custom-checkbox)::after {
+    content: "";
+    display: inline-block;
+    width: 60%;
+    height: 60%;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M5 13 L9 17 L19 7' fill='none' stroke='%23FFFFFF' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+body:not(.light-theme) input[type="checkbox"]:not(.no-custom-checkbox):checked {
+    background: #29ab87 !important;
+    border-color: #000 !important; /* keep the black outline visible when checked */
+}
+
+body:not(.light-theme) input[type="checkbox"]:not(.no-custom-checkbox):checked::after {
+    opacity: 1;
+}
+
+.habit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.habit-header h3 {
+    color: var(--dark);
+    margin: 0;
+}
+
+.habit-freq {
+    background: rgba(var(--primary-rgb), 0.08);
+    color: var(--primary);
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.habit-body {
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+}
+
+.habit-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.transaction-item {
+    background: var(--card-bg);
+    padding: 1.2rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+}
+
+.transaction-info h4 { margin: 0 0 0.3rem 0; color: var(--text-main); }
+.transaction-info p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+.transaction-info small { color: var(--text-muted); }
+
+/* Notes page: larger font sizes for title and content */
+body.page-notes .transaction-info h4 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #a0c7bc;
+}
+
+body.page-notes .transaction-info p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: #F5F5F5;
+    white-space: pre-wrap;
+}
+
+.transaction-amount { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.note-card {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+    transition: all 0.3s;
+}
+
+.note-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+}
+
+.note-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--border-alpha);
+    padding-bottom: 0.5rem;
+}
+
+.note-header h3 { margin: 0; color: var(--text-main); }
+.note-header small { color: var(--text-muted); }
+.note-content { margin-bottom: 1rem; line-height: 1.6; color: var(--text-muted); white-space: pre-wrap; }
+
+/* ============ WEATHER ============ */
+.weather-card {
+    background: var(--card-bg);
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    margin-top: 2rem;
+}
+
+.weather-info {
+    text-align: center;
+}
+
+.weather-info h2 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    color: var(--text-main);
+}
+
+.weather-main {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin: 2rem 0;
+}
+
+.temp {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.description {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    text-transform: capitalize;
+}
+
+.weather-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--border-alpha);
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 1.1rem;
+}
+
+.detail-item i {
+    font-size: 1.5rem;
+    color: var(--primary);
+}
+
+/* clock widget styles removed */
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+/* ============ QUICK ACTIONS ============ */
+.quick-actions {
+    background: var(--card-bg); /* quick actions */
+    padding: 2rem;
+    border-radius: 15px;
+    margin-top: 2rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+
+.quick-actions h3 {
+    margin-bottom: 1.5rem;
+    color: var(--text-main);
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.action-btn {
+    background: #33665e;
+    color: var(--text-main);
+    padding: 1rem;
+    /* match chart-card/stat-card border-radius for visual consistency */
+    border-radius: 15px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    /* normalize base shadow to chart-card */
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    position: relative;
+    z-index: 1;
+    /* Allow text selection but prevent link dragging */
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    -webkit-user-drag: none !important;
+    -khtml-user-drag: none !important;
+    -moz-user-drag: none !important;
+    -o-user-drag: none !important;
+    /* Prevent touch callout on mobile */
+    -webkit-touch-callout: none !important;
+}
+
+.action-btn:hover {
+    /* Hover: use lighter color #3d7a6f from attachment */
+    background: #3d7a6f;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+    /* Ensure no selection even on hover */
+    cursor: pointer !important;
+}
+
+.action-btn:active {
+    /* Active/click: use darker color #3f6e66 from attachment, then returns to normal */
+    background: #3f6e66;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+/* keyboard focus visible state to match clickable feel */
+.action-btn:focus-visible {
+    outline: 3px solid rgba(var(--primary-rgb), 0.12);
+    outline-offset: 2px;
+    /* focus shows the same glow as hover but slightly reduced */
+    box-shadow: 0 8px 20px rgba(var(--primary-rgb), 0.30);
+}
+
+/* Allow text selection but prevent dragging on child elements */
+.action-btn i,
+.action-btn *,
+.action-btn::before,
+.action-btn::after {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -webkit-user-drag: none !important;
+    -webkit-touch-callout: none !important;
+    pointer-events: none !important;
+    cursor: inherit !important;
+}
+
+/* ============ STATS ============ */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.stat-box {
+    background: var(--card-bg);
+    padding: 2rem;
+    border-radius: 15px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.stat-box i {
+    font-size: 2.5rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+
+.stat-box h3 {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.stat-box p {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+/* ============ EMPTY STATE ============ */
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+/* ============ ERROR STATE ============ */
+.error {
+    color: var(--danger);
+    padding: 1rem;
+    background: rgba(var(--danger-rgb), 0.08);
+    border-radius: 10px;
+    text-align: center;
+}
+
+/* ===== Global shadow with #4a5050 color =====
+   Provide a consistent #4a5050 colored shadow across all UI containers (boxes, cards)
+   excluding clickable buttons. This creates a cohesive visual elevation system.
+   All shadows use the same length and intensity for visual uniformity.
+*/
+:root {
+    /* Use pure black shadows for all UI boxes as requested (changed from grey).
+       Keep the same offsets and alpha to preserve perceived elevation. */
+    --global-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    --global-shadow-strong: 0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+/* Apply #4a5050 colored shadows to all UI boxes/cards (non-interactive surfaces).
+   Buttons are excluded and keep their own shadows for interactive feedback. */
+.chart-card,
+.stat-card,
+.stat-box,
+.form-card,
+.note-card,
+.task-card,
+.transaction-item,
+.budget-card,
+.page-header,
+.chart-legend .legend-swatch,
+.transactions-card,
+.weather-card,
+.detail-item,
+.habit-card,
+.greeting-card,
+.quick-actions {
+    box-shadow: var(--global-shadow) !important;
+}
+
+/* Force legend swatches inside chart-cards to be perfectly flat (no border/outline/shadow)
+   This removes any residual outline around the small color squares shown in the
+   pie/doughnut header legends and ensures tooltip swatches match (canvas swatches
+   are controlled via Chart.js callbacks, but DOM swatches can still inherit shadows). */
+.chart-card .chart-legend .legend-swatch,
+.chart-card .chart-legend .legend-swatch.pending-swatch {
+    /* Keep chart-card header swatches perfectly flat with no outline */
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    -webkit-box-shadow: none !important;
+}
+
+/* Dashboard-specific: remove any border for legend swatches in the dashboard
+   so the small Completed/Pending squares are perfectly flat with no outline
+   while still allowing other pages (like light-theme overrides) to keep their
+   desired border if needed. This targets the dashboard section specifically. */
+.dashboard .chart-legend .legend-swatch,
+.dashboard .chart-legend .legend-swatch.pending-swatch {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Hide header legends inside the dashboard immediately to avoid
+    visual flash before JS runs. The DOM was removed for Task/Habit,
+    but this CSS ensures no brief flicker of the legend occurs. */
+.chart-container { 
+    position: relative;
+}
+
+/* Prevent flash during chart recreation by hiding canvas briefly during transition */
+.chart-container canvas {
+    opacity: 1;
+    transition: opacity 0.05s ease-in-out;
+}
+
+/* Position the small legend in the top-right corner of the chart container */
+.chart-legend.top-right {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 5;
+    pointer-events: none; /* keep non-interactive */
+}
+.chart-legend.top-right .legend-label { pointer-events: none; }
+
+/* Inline legend next to chart heading */
+.chart-legend-inline {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-left: auto;
+}
+
+.chart-legend-inline .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e8f5e9;
+    letter-spacing: 0.3px;
+}
+
+.chart-legend-inline .legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* Remove shadow from the navbar (My Life Tracker branding box) */
+.navbar {
+    box-shadow: none !important;
+}
+
+/* Slightly stronger on elements that need more separation */
+.stat-viridian,
+.quick-stats .stat-viridian,
+.chart-card.higher,
+.btn-primary.large {
+    box-shadow: var(--global-shadow-strong) !important;
+}
+
+/* Light theme: keep existing light-theme shadows but slightly reduce them too */
+body.light-theme .chart-card,
+body.light-theme .form-card,
+body.light-theme .quick-actions,
+body.light-theme .habit-card,
+body.light-theme .task-card,
+body.light-theme .transaction-item,
+body.light-theme .note-card,
+body.light-theme .weather-card,
+body.light-theme .action-btn {
+    box-shadow: 0 3px 8px rgba(139, 95, 168, 0.06) !important;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 768px) {
+    .navbar {
+        flex-direction: column;
+        padding: 1rem;
+        gap: 1rem;
+    }
+
+    .nav-links {
+        width: 100%;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    /* clock widget removed; no responsive rules required */
+
+    .dashboard {
+        padding: 1rem;
+    }
+
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
+
+    .quick-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .notes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .greeting-card {
+        padding: 1.5rem;
+    }
+
+    .greeting-card h2 {
+        font-size: 1.3rem;
+    }
+}
+
+/* Make the doughnut slightly smaller on very narrow screens */
+@media (max-width: 420px) {
+    .chart-container { --chart-size: 220px; }
+}
+
+@media (max-width: 480px) {
+    .nav-links {
+        gap: 0.5rem;
+    }
+
+    .nav-links a {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.9rem;
+    }
+
+    .quick-actions {
+        padding: 1rem;
+    }
+
+    .actions-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-group {
+        grid-template-columns: 1fr;
+    }
+
+    .task-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .transaction-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+}
+
+/* ===== Theme overrides for templates with inline styles (weather.html, etc.) =====
+   These rules use !important so they override template-level <style> blocks
+   and enforce the global dark-green theme without changing templates or JS.
+*/
+.weather-card {
+    background: var(--card-bg) !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+
+.weather-main {
+    background: transparent !important;
+    color: var(--text-main) !important;
+    padding: 2rem !important;
+}
+
+.detail-item {
+    background: rgba(255,255,255,0.02) !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+}
+
+.form-card {
+    background: var(--card-bg) !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+
+.input-field {
+    background: transparent !important;
+    color: var(--text-main) !important;
+    border-color: rgba(255,255,255,0.06) !important;
+}
+
+.input-field:focus {
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb),0.12) !important;
+    border-color: var(--primary) !important;
+}
+
+.empty-state { color: var(--text-muted) !important; }
+.loading { color: var(--primary) !important; }
+.btn-primary { background: var(--primary) !important; color: var(--text-main) !important; }
+
+/* Frequency selector removed from Habits UI — related rules deleted */
+
+/* Completed button (habit card) - active state should match freq active state */
+/* In Habits (Green Dark Mode) keep completed highlight with darker viridian - solid like Delete */
+body.page-habits:not(.light-theme) .btn-done,
+body.page-habits:not(.light-theme) button.btn-done {
+    /* Completed highlight: solid color matching Delete button style */
+    background: #33665e !important;
+    color: var(--text-main) !important;
+    border: none !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+body.page-habits:not(.light-theme) .btn-done:hover,
+body.page-habits:not(.light-theme) .btn-done:focus {
+    /* Disable hover lift for Completed state — keep button visually stable */
+    background: #3d7a6f !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+body.page-habits:not(.light-theme) .btn-done:active,
+body.page-habits:not(.light-theme) .btn-done[aria-pressed="true"] {
+    background: #33665e !important;
+    box-shadow: none !important;
+}
+
+/* Keep Delete button untouched — .btn-danger remains unchanged in both themes */
+
+/* Ensure the active visual updates instantly (CSS-only) when JS toggles the classes */
+
+
+/* Strongly-scoped rule to ensure the 'Mark Done' highlight only affects the button
+   inside habit actions. This increases specificity and uses !important so it wins
+   over other theme overrides or cached styles. */
+.habit-actions .btn-done {
+    /* Keep habit action button styling solid like Delete button */
+    background: #33665e !important;
+    background-image: none !important;
+    color: var(--text-main) !important;
+    border: none !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+    padding: 0.85rem 1.8rem !important;
+    border-radius: 16px !important;
+    min-width: 140px;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+}
+.habit-actions .btn-done i { color: var(--text-main) !important; }
+
+/* Ensure habit action buttons also follow the Green Dark Mode neutral color */
+/* Habits page: ensure the Mark Done inside habit actions uses darker viridian - solid */
+body.page-habits:not(.light-theme) .habit-actions .btn-done {
+    /* Use darker viridian color for Completed state - solid like Delete */
+    background: #33665e !important;
+    color: var(--text-main) !important;
+    border: none !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+/* ============ LIGHT THEME (PURPLE) ============ */
+body.light-theme {
+    --bg-main: #E6DFF0;            /* Soft lavender background matching reference */
+    --card-bg: #F0E6FA;            /* Light lavender for cards */
+    --stat-viridian-bg: #8B5FA8;   /* Medium purple for stat cards matching reference */
+    --primary: #B084CC;            /* Soft pastel purple for buttons */
+    --primary-rgb: 176, 132, 204;  /* RGB for primary color */
+    --danger: #8B5FA8;
+    --danger-rgb: 139, 95, 168;
+    --text-main: #5A4771;          /* Dark muted purple for main text */
+    --text-muted: #7B6B8F;         /* Lighter muted purple for secondary text */
+    --nav-bg: #9B6FB8;             /* Medium purple navbar matching reference */
+    --nav-inactive: #FFFFFF;       /* White for inactive nav items */
+    --border-alpha: rgba(139, 95, 168, 0.12);
+    
+    /* PURPLE LIGHT MODE - Chart color system (isolated from green mode) */
+    --chart-completed: #7B61B9;    /* Deep purple for completed */
+    --chart-pending: #4a5050;      /* Pending color aligned with dashboard */
+    --chart-outline: #5A4771;      /* Dark purple outline for light theme */
+    
+    /* PURPLE LIGHT MODE - Legend colors (keep same as chart colors) */
+    --legend-completed: #7B61B9;   /* Deep purple for legend */
+    --legend-pending: #4a5050;     /* Legend pending color aligned with dashboard */
+}
+
+/* Smooth theme transitions for all themeable elements */
+body {
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.navbar,
+.page-header,
+.greeting-card,
+.stat-card,
+.chart-card,
+.form-card,
+.quick-actions,
+.habit-card,
+.task-card,
+.transaction-item,
+.note-card,
+.weather-card,
+.action-btn,
+.btn,
+.input-field {
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Light theme: stat card text should be white for contrast against dark purple */
+body.light-theme .stat-viridian .stat-icon,
+body.light-theme .stat-viridian .stat-icon i,
+body.light-theme .stat-viridian .stat-content h3,
+body.light-theme .stat-viridian .stat-number {
+    color: #F2F3F4 !important;
+}
+
+/* Light theme: navbar items are white, active gets light purple pill background */
+body.light-theme .nav-links a {
+    color: #F2F3F4;
+}
+
+/* Light theme: page headers and card titles use dark muted purple */
+body.light-theme .page-header h1,
+body.light-theme .page-header p,
+body.light-theme .form-card h2,
+body.light-theme .quick-actions h3,
+body.light-theme .habit-card h3,
+body.light-theme .transaction-info h4,
+body.light-theme .note-header h3 {
+    color: #5A4771;
+}
+
+/* Light theme: transaction amounts use deep purple */
+body.light-theme .transaction-amount {
+    color: #7B5FA8;
+    font-weight: 700;
+}
+
+/* Light theme: weather details icons use deep purple */
+body.light-theme .detail-item i,
+body.light-theme .weather-info .temp {
+    color: #7B5FA8;
+}
+
+/* Light theme: navbar brand text and icon - use white for maximum contrast */
+body.light-theme .nav-brand,
+body.light-theme .nav-brand i {
+    color: #F2F3F4;
+}
+
+/* Light theme: active nav item uses light purple background */
+body.light-theme .nav-links a.active {
+    color: #5A4771;
+    background: #D8C9E6;
+    border-radius: 20px;
+}
+
+/* Light theme: primary buttons and action buttons use soft pastel purple */
+body.light-theme .btn-primary,
+body.light-theme .action-btn {
+    background: #D8C9E6;
+    color: #5A4771;
+    /* disable dark-mode-only text glow */
+    text-shadow: none;
+}
+
+/* Page-specific: apply the Add Habit accent color to buttons on Tasks, Budget,
+   Notes and Weather pages only (exclude Habits here since it already uses its own
+   habit-accent rules). Hover/active states use the pressed variants. */
+body.page-tasks .btn:not(.btn-danger),
+body.page-tasks .btn-primary:not(.btn-danger),
+body.page-budget .btn:not(.btn-danger),
+body.page-budget .btn-primary:not(.btn-danger),
+body.page-notes .btn:not(.btn-danger),
+body.page-notes .btn-primary:not(.btn-danger),
+body.page-weather .btn:not(.btn-danger),
+body.page-weather .btn-primary:not(.btn-danger) {
+    background: var(--habit-accent); /* use Add Habit accent variable */
+    color: var(--text-main);
+    /* subtle white text glow by default in Green Dark Mode */
+    text-shadow: 0 1px 6px rgba(255,255,255,0.12);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+
+/* Hover: remove white glow, apply soft black shadow beneath (pressed/elevated look)
+   and use the pressed accent for hover feedback. */
+body.page-tasks .btn:not(.btn-danger):hover,
+body.page-tasks .btn-primary:not(.btn-danger):hover,
+body.page-budget .btn:not(.btn-danger):hover,
+body.page-budget .btn-primary:not(.btn-danger):hover,
+body.page-notes .btn:not(.btn-danger):hover,
+body.page-notes .btn-primary:not(.btn-danger):hover,
+body.page-weather .btn:not(.btn-danger):hover,
+body.page-weather .btn-primary:not(.btn-danger):hover {
+    text-shadow: none;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.75);
+    background: var(--habit-accent-pressed) !important;
+}
+
+/* High-specificity override: ensure the Add Task primary button inside the
+   form-card uses the habit accent even if other rules or cached CSS conflict. */
+body.page-tasks .form-card .btn.btn-primary {
+    background: var(--habit-accent) !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+
+body.page-tasks .form-card .btn.btn-primary:hover {
+    /* Match Add Habit hover: same background color, soft dark shadow */
+    background: var(--habit-accent) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+}
+body.page-tasks .form-card .btn.btn-primary:active {
+    /* Match Add Habit active: pressed background */
+    background: var(--habit-accent-pressed-dark) !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease !important;
+}
+
+/* Budget: ensure Save (in budget-card) and Add Expense (in form-card) use Add Task/Habit accent */
+body.page-budget .budget-card .btn.btn-primary,
+body.page-budget .form-card .btn.btn-primary {
+    background: var(--habit-accent) !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+
+body.page-budget .budget-card .btn.btn-primary:hover,
+body.page-budget .form-card .btn.btn-primary:hover {
+    /* Match Add Habit hover: same background color, soft dark shadow */
+    background: var(--habit-accent) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+}
+body.page-budget .budget-card .btn.btn-primary:active,
+body.page-budget .form-card .btn.btn-primary:active {
+    background: var(--habit-accent-pressed-dark) !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease !important;
+}
+
+/* Notes: ensure Save Note button uses Add Task / Habit accent */
+body.page-notes .form-card .btn.btn-primary {
+    background: var(--habit-accent) !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+
+body.page-notes .form-card .btn.btn-primary:hover {
+    /* Match Add Habit hover: same background color, soft dark shadow */
+    background: var(--habit-accent) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+}
+body.page-notes .form-card .btn.btn-primary:active {
+    background: var(--habit-accent-pressed-dark) !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease !important;
+}
+
+/* Weather: ensure Search button behaves exactly like quick-action buttons */
+/* Make the Search button in Weather with custom color after release */
+body.page-weather .form-card .btn.btn-primary {
+    background: #2f5751 !important; /* color after release from attachment */
+    color: var(--text-main) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+
+body.page-weather .form-card .btn.btn-primary:hover {
+    background: #3d7a6f !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+}
+
+body.page-weather .form-card .btn.btn-primary:active {
+    background: #3f6e66 !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease !important;
+}
+
+/* Green Dark Mode: make the Add Habit (primary) button highlight use the
+   theme primary (#29AB87) when hovered/focused. This only affects Green
+   Dark Mode and preserves the base button background in its idle state. */
+
+body.page-habits:not(.light-theme) .btn-primary:hover,
+body.page-habits:not(.light-theme) .btn-primary:focus {
+    background: var(--habit-accent) !important; /* use pasted color on hover/focus */
+    color: var(--text-main) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+    /* keep the button visually stable on hover/focus (no pop-up) */
+    transform: none !important;
+}
+
+body.page-habits:not(.light-theme) .btn-primary:focus-visible {
+    outline: 3px solid rgba(51,102,94,0.12) !important; /* faint ring using habit accent */
+    outline-offset: 2px !important;
+}
+
+/* Remove native browser focus/active/tap highlights on the Add Habit button so
+   it only uses the custom dark-mode styles. We intentionally do NOT touch
+   :focus-visible so keyboard focus still shows the custom faint ring above.
+   This block disables mobile tap highlight, native blue flash, and inner
+   focus rings on various browsers. */
+body.page-habits .btn-primary,
+body.page-habits .btn-primary:active,
+body.page-habits .btn-primary:focus,
+body.page-habits .btn-primary::-moz-focus-inner {
+    -webkit-tap-highlight-color: transparent !important; /* mobile tap */
+    outline: none !important;    /* remove UA outlines */
+    background-image: none !important; /* prevent native flash overlays */
+}
+
+/* Ensure our custom focus-visible rule (above) still applies when keyboard-focused */
+body.page-habits .btn-primary:focus-visible {
+    outline: 3px solid rgba(51,102,94,0.12) !important;
+    outline-offset: 2px !important;
+}
+
+/* Make the Add Habit button behave EXACTLY like Add Expense button in Budget screen
+   (same colors, shadows, hover, and active states). Standard primary button behavior:
+   normal → hover → active (pressed briefly) → back to normal. No toggle/selected logic. */
+body.page-habits .form-card .btn.btn-primary {
+    background: var(--habit-accent) !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+
+body.page-habits .form-card .btn.btn-primary:hover {
+    /* Hover uses the lighter color from first attachment */
+    background: #3d7a6f !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+}
+
+body.page-habits .form-card .btn.btn-primary:active {
+    /* Active/click uses the darker color from second attachment, then returns to normal */
+    background: #3f6e66 !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease !important;
+}
+
+/* Make the Add Task button behave EXACTLY like Add Habit button
+   (same colors, shadows, hover, and active states). */
+body.page-tasks .form-card .btn.btn-primary {
+    background: var(--habit-accent) !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+
+body.page-tasks .form-card .btn.btn-primary:hover {
+    background: #3d7a6f !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+}
+
+body.page-tasks .form-card .btn.btn-primary:active {
+    background: #3f6e66 !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease !important;
+}
+
+/* Make the Save and Add Expense buttons on the Budget page behave like quick-action
+   buttons (same hover colour and pressed shadow) so they match Add Habit/Task
+   visuals. Scoped to Budget page form-cards (.budget-card and .form-card). */
+body.page-budget .budget-card .btn.btn-primary:hover,
+body.page-budget .form-card .btn.btn-primary:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+    background: #3d7a6f !important; /* match .action-btn hover */
+}
+
+body.page-budget .budget-card .btn.btn-primary:active,
+body.page-budget .budget-card .btn.btn-primary[aria-pressed="true"],
+body.page-budget .form-card .btn.btn-primary:active,
+body.page-budget .form-card .btn.btn-primary[aria-pressed="true"] {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    background: #3f6e66 !important;
+}
+
+/* Make the Save Note button on the Notes page behave like quick-action buttons
+   (same hover colour and pressed shadow) so it matches Add Habit/Task visuals.
+   Scoped to Notes page form-card. */
+body.page-notes .form-card .btn.btn-primary:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+    background: #3d7a6f !important; /* match .action-btn hover */
+}
+
+body.page-notes .form-card .btn.btn-primary:active,
+body.page-notes .form-card .btn.btn-primary[aria-pressed="true"] {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    background: #3f6e66 !important;
+}
+
+/* Make the Search button on the Weather page behave like quick-action buttons
+   (same hover colour and pressed shadow) so it matches Add Habit/Task visuals.
+   Scoped to Weather page form-card. */
+body.page-weather .form-card .btn.btn-primary:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45) !important;
+    background: #3d7a6f !important; /* match .action-btn hover */
+}
+
+body.page-weather .form-card .btn.btn-primary:active,
+body.page-weather .form-card .btn.btn-primary[aria-pressed="true"] {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55) !important;
+    background: #3f6e66 !important;
+}
+
+/* Ensure Purple Light Mode is unaffected: disable dark-mode glow and use existing light-theme rules */
+body.light-theme .page-habits .btn,
+body.light-theme .page-habits .btn-primary,
+body.light-theme .page-tasks .btn,
+body.light-theme .page-tasks .btn-primary,
+body.light-theme .page-budget .btn,
+body.light-theme .page-budget .btn-primary,
+body.light-theme .page-notes .btn,
+body.light-theme .page-notes .btn-primary,
+body.light-theme .page-weather .btn,
+body.light-theme .page-weather .btn-primary {
+    text-shadow: none !important;
+    /* Let existing light-theme button rules take precedence for background/box-shadow */
+}
+
+body.light-theme .btn-primary:hover,
+body.light-theme .action-btn:hover {
+    background: #C9B8D9;
+    box-shadow: 0 4px 12px rgba(139, 95, 168, 0.2);
+}
+
+/* Light theme: active nav items hover */
+body.light-theme .nav-links a:hover {
+    color: #F2F3F4;
+    opacity: 0.9;
+}
+
+/* Frequency buttons removed from UI; light-theme rules for them were deleted */
+
+/* Light theme: input focus uses purple */
+body.light-theme .input-field:focus {
+    border-color: #4F1271;
+    box-shadow: 0 0 0 3px rgba(79, 18, 113, 0.12);
+}
+
+/* Light theme: enhanced shadows for depth and visual weight */
+body.light-theme .navbar,
+body.light-theme .page-header,
+body.light-theme .greeting-card,
+body.light-theme .stat-card,
+body.light-theme .chart-card,
+body.light-theme .form-card,
+body.light-theme .quick-actions,
+body.light-theme .habit-card,
+body.light-theme .task-card,
+body.light-theme .transaction-item,
+body.light-theme .chart-card,
+body.light-theme .form-card,
+body.light-theme .quick-actions,
+body.light-theme .habit-card,
+body.light-theme .task-card,
+body.light-theme .transaction-item,
+body.light-theme .note-card,
+body.light-theme .weather-card,
+body.light-theme .action-btn {
+    box-shadow: 0 4px 12px rgba(139, 95, 168, 0.1);
+}
+
+/* Light theme: chart labels, legend text, and progress indicators - darker for better contrast */
+body.light-theme .chart-legend .legend-label,
+body.light-theme .chart-card h3,
+body.light-theme .habit-body p,
+body.light-theme .progress-count,
+body.light-theme .stat-box h3,
+body.light-theme .stat-box p {
+    color: #3A3254;
+}
+
+/* Light theme: override completed swatch color in chart legends using CSS variables with borders */
+body.light-theme .chart-legend .legend-swatch:not(.pending-swatch) {
+    background-color: var(--legend-completed);
+    border: none; /* no outline in light mode */
+}
+
+/* Light theme: override pending swatch color using CSS variables with borders */
+body.light-theme .chart-legend .legend-swatch.pending-swatch {
+    background-color: var(--legend-pending);
+    border: none; /* no outline in light mode */
+}
+
+/* Light theme: Completed button styling uses deep purple matching charts */
+body.light-theme .habit-actions .btn-done {
+    background: #7B5FA8 !important;
+    color: #F2F3F4 !important;
+    border-color: #7B5FA8 !important;
+}
+
+body.light-theme .habit-actions .btn-done i {
+    color: #F2F3F4 !important;
+}
+
+/* Light theme: secondary button text */
+body.light-theme .btn-secondary {
+    color: #5A4771;
+    background: #F0E6FA;
+    border-color: rgba(139, 95, 168, 0.2);
+}
+
+body.light-theme .btn-secondary:hover {
+    background: rgba(111, 48, 150, 0.08);
+    border-color: #6F3096;
+}
+
+/* Light theme: input fields have better contrast */
+body.light-theme .input-field {
+    background: rgba(255, 255, 255, 0.6);
+    color: #3A3254;
+    border-color: rgba(79, 18, 113, 0.25);
+}
+
+body.light-theme .input-field::placeholder {
+    color: #5A4A6F;
+    opacity: 0.8;
+}
+
+body.light-theme .input-field:focus {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: #6F3096;
+    box-shadow: 0 0 0 3px rgba(111, 48, 150, 0.15);
+}
+
+/* Light theme: sun icon matches navbar icon color (white) */
+body.light-theme .theme-toggle-icon.sun {
+    color: #F2F3F4;
+}
+
+/* ============ THEME TOGGLE SWITCH ============ */
+.theme-toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.theme-toggle {
+    position: relative;
+    width: 60px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    cursor: pointer;
+    transition: background-color 0.25s ease;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.theme-toggle-slider {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: #29AB87;
+    border-radius: 50%;
+    transition: transform 0.25s ease, background-color 0.25s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.theme-toggle.active {
+    background: #DA70D6;
+    border-color: #6F3096;
+}
+
+.theme-toggle.active .theme-toggle-slider {
+    transform: translateX(30px);
+    background: #6F3096;
+}
+
+.theme-toggle-icon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.theme-toggle-icon.sun {
+    right: 6px;
+    color: #A7CFC2; /* Matches navbar icon color in Green Dark Mode */
+}
+
+.theme-toggle-icon.moon {
+    left: 6px;
+    color: #E6E3F0;
+}
+

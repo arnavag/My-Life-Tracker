@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Life Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ range(1, 999999) | random }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Styles are loaded from static/css/style.css for consistent layout across pages -->
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand" style="cursor: pointer;" onclick="window.location.href='/';">
+            <i class="fas fa-chart-line"></i>
+            <span>My Life Tracker</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
+            <li><a href="/habits"><i class="fas fa-fire"></i> Habits</a></li>
+            <li><a href="/tasks"><i class="fas fa-list-check"></i> Tasks</a></li>
+            <li><a href="/budget"><i class="fas fa-wallet"></i> Budget</a></li>
+            <li><a href="/notes"><i class="fas fa-sticky-note"></i> Notes</a></li>
+            <li><a href="/weather"><i class="fas fa-cloud-sun"></i> Weather</a></li>
+            <li><a href="/stats"><i class="fas fa-chart-bar"></i> Stats</a></li>
+        </ul>
+        <div class="theme-toggle-wrapper">
+            <div class="theme-toggle" id="themeToggle">
+                <span class="theme-toggle-icon moon"><i class="fas fa-moon"></i></span>
+                <span class="theme-toggle-icon sun"><i class="fas fa-sun"></i></span>
+                <div class="theme-toggle-slider"></div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="dashboard">
+        <div class="greeting-card">
+            <div class="greeting-row">
+                <div class="greeting-content">
+                    <h2>Welcome Back!</h2>
+                    <p id="heroTagline">Let’s Make Today Productive!</p>
+                </div>
+
+                <div class="time-block" aria-hidden="true">
+                    <div class="time-display">
+                        <span id="hours">00</span>
+                        <span class="clock-separator">:</span>
+                        <span id="minutes">00</span>
+                        <span class="clock-separator">:</span>
+                        <span id="seconds">00</span>
+                    </div>
+                    <div class="date-display" id="date-display">{{ today.split(', ', 1)[1] }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="quick-stats">
+            <a href="/habits" class="stat-card stat-viridian">
+                <div class="stat-icon"><i class="fas fa-fire"></i></div>
+                <div class="stat-content">
+                    <h3>Daily Habits</h3>
+                    <p class="stat-number">{{ completed_habits_today }}/{{ total_habits }}</p>
+                </div>
+            </a>
+            <a href="/tasks" class="stat-card stat-viridian">
+                <div class="stat-icon"><i class="fas fa-list-check"></i></div>
+                <div class="stat-content">
+                    <h3>Tasks Today</h3>
+                    <p class="stat-number">{{ completed_tasks }}/{{ total_tasks }}</p>
+                </div>
+            </a>
+            <a href="/budget" class="stat-card stat-viridian">
+                <div class="stat-icon"><i class="fas fa-wallet"></i></div>
+                <div class="stat-content">
+                    <h3 id="dashboardBudgetLabel">Monthly Budget</h3>
+                    <p class="stat-number">₹<span id="dashboardMonthlyBudget">{% if budget_limit == budget_limit|int %}{{ budget_limit|int }}{% else %}{{ '%.2f'|format(budget_limit) }}{% endif %}</span></p>
+                </div>
+            </a>
+            <a href="/notes" class="stat-card stat-viridian">
+                <div class="stat-icon"><i class="fas fa-sticky-note"></i></div>
+                <div class="stat-content">
+                    <h3>Notes Taken</h3>
+                    <p class="stat-number">{{ notes_count }}</p>
+                </div>
+            </a>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-fire"></i> Daily Habit Progress</h3>
+                        <div class="chart-legend-inline">
+                            <div class="legend-item">
+                                <span class="legend-color" style="background-color: var(--chart-completed);"></span>
+                                <span>Completed</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background-color: var(--chart-pending);"></span>
+                                <span>Pending</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- chart wrapper gives fixed height and centers the doughnut -->
+                    <div class="chart-container">
+                        <canvas id="habitProgressChart"></canvas>
+                    </div>
+            </div>
+
+            <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-list-check"></i> Daily Task Progress</h3>
+                        <div class="chart-legend-inline">
+                            <div class="legend-item">
+                                <span class="legend-color" style="background-color: var(--chart-completed);"></span>
+                                <span>Completed</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background-color: var(--chart-pending);"></span>
+                                <span>Pending</span>
+                            </div>
+                        </div>
+                    </div>
+                <div class="chart-container">
+                    <canvas id="taskProgressChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <h3>Quick Actions</h3>
+            <div class="actions-grid">
+                <a href="/habits" class="action-btn" draggable="false"><i class="fas fa-plus-circle"></i> Add Habit</a>
+                <a href="/tasks" class="action-btn" draggable="false"><i class="fas fa-plus-circle"></i> Add Task</a>
+                <a href="/budget" class="action-btn" draggable="false"><i class="fas fa-plus-circle"></i> Add Expense</a>
+                <a href="/notes" class="action-btn" draggable="false"><i class="fas fa-plus-circle"></i> Add Note</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Charts are initialized by /static/js/script.js which fetches live data -->
+    <!-- Include the shared script to create/update charts dynamically. -->
+    <script src="{{ url_for('static', filename='js/script.js') }}?v={{ range(1, 999999) | random }}"></script>
+        <!-- Force reload stylesheet to avoid stale cache so recent CSS edits appear immediately -->
+        <script>
+            (function(){
+                try {
+                    const links = document.querySelectorAll('link[rel="stylesheet"][href*="css/style.css"]');
+                    links.forEach(l => {
+                        const href = l.getAttribute('href').split('?')[0];
+                        l.href = href + '?v=' + Date.now();
+                    });
+                } catch (e) { /* no-op */ }
+            })();
+        </script>
+        <!-- Prevent drag behavior on action buttons but allow text selection -->
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const actionButtons = document.querySelectorAll('.action-btn');
+                actionButtons.forEach(btn => {
+                    // Prevent only drag events, not text selection
+                    btn.addEventListener('dragstart', e => e.preventDefault());
+                    btn.addEventListener('drag', e => e.preventDefault());
+                    btn.addEventListener('dragend', e => e.preventDefault());
+                    
+                    // Also prevent on child elements
+                    const children = btn.querySelectorAll('*');
+                    children.forEach(child => {
+                        child.addEventListener('dragstart', e => e.preventDefault());
+                        child.addEventListener('drag', e => e.preventDefault());
+                    });
+                });
+            });
+        </script>
+</body>
+</html>
